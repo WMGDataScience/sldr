@@ -65,17 +65,17 @@ def get_params(args=[], verbose=False):
                         help='random seed for repeatability')
     parser.add_argument("--buffer_length", default=int(1e6), type=int,
                         help="replay memory buffer capacity")
-    parser.add_argument("--n_episodes", default=60000, type=int,
+    parser.add_argument("--n_episodes", default=200, type=int,
                         help="number of episodes")
     parser.add_argument("--n_episodes_test", default=1000, type=int,
                         help="number of episodes")
-    parser.add_argument("--episode_length", default=25, type=int,
+    parser.add_argument("--episode_length", default=50, type=int,
                         help="number of steps for episode")
-    parser.add_argument("--episode_length_test", default=25, type=int,
+    parser.add_argument("--episode_length_test", default=50, type=int,
                         help="number of steps for episode")
     parser.add_argument("--steps_per_update", default=100, type=int,
                         help="target networks update frequency")
-    parser.add_argument("--batch_size", default=1024, type=int,
+    parser.add_argument("--batch_size", default=256, type=int,
                         help="batch size for model training")
     parser.add_argument("--n_exploration_eps", default=-1, type=int,
                         help="exploration epsilon, -1: n_episodes")
@@ -85,23 +85,23 @@ def get_params(args=[], verbose=False):
                         help="noise stop updates value")
     parser.add_argument("--save_epochs", default=5000, type=int,
                         help="save model interval")
-    parser.add_argument("--plcy_lr", default=0.01, type=float,
+    parser.add_argument("--plcy_lr", default=0.001, type=float,
                         help="learning rate")
-    parser.add_argument("--crtc_lr", default=0.01, type=float,
+    parser.add_argument("--crtc_lr", default=0.001, type=float,
                         help="learning rate")
-    parser.add_argument("--tau", default=0.01, type=float,
+    parser.add_argument("--tau", default=0.05, type=float,
                         help="soft update parameter")
     parser.add_argument("--gamma", default=0.95, type=float,
                         help="discount factor")
     parser.add_argument("--agent_alg",
                         default="DDPG", type=str,
-                        choices=['DDPG', 'DDPGC'])
+                        choices=['DDPG', 'HDDPG', 'DDPGC'])
     parser.add_argument("--device", default='cuda',
                         choices=['cpu','cuda'], 
                         help="device type")
-    parser.add_argument("--plcy_hidden_dim", default=128, type=int, 
+    parser.add_argument("--plcy_hidden_dim", default=256, type=int, 
                         help="actor hidden state dimension")
-    parser.add_argument("--crtc_hidden_dim", default=64, type=int, 
+    parser.add_argument("--crtc_hidden_dim", default=256, type=int, 
                         help="critic hidden state dimension")      
 
     parser.add_argument("--agent_type", default='basic',
@@ -137,10 +137,6 @@ def get_params(args=[], verbose=False):
     parser.add_argument("--discrete_action", default="False",
                         choices=['True', 'False'],
                         help="discrete actions")
-    parser.add_argument("--comm_plcy_lr", default=0.01, type=float,
-                        help="learning rate")
-    parser.add_argument("--comm_crtc_lr", default=0.01, type=float,
-                        help="learning rate")
 
 
     parser.add_argument('--verbose', default=1, type=int,\

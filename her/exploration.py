@@ -46,3 +46,25 @@ class OUNoise:
         dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(len(x))
         self.state = x + dx
         return self.state * self.scale
+
+    def get_noisy_action(self, x):
+        return  x+self.noise() 
+
+
+class Noise:
+    def __init__(self,action_dimension, sigma=0.2, eps=0.3, max_u=1.0):
+         self.action_dimension = action_dimension
+         self.sigma = sigma
+         self.eps = eps
+         self.max_u = max_u
+
+    def noise(self):
+        return self.sigma*np.random.randn(self.action_dimension)
+
+    def random_action(self):
+        return np.random.uniform(low=-self.max_u, high=self.max_u, size=self.action_dimension)
+
+    def get_noisy_action(self, x):
+        p = np.random.binomial(1,self.eps)
+        return p*self.random_action() + (1-p)*(x+self.noise()) 
+

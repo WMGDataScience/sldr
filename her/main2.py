@@ -10,16 +10,20 @@ import torch.nn.functional as F
 
 import gym
 
-from her.algorithms import DDPG, DDPGC
-from her.experience import ReplayMemory, Transition
-from her.exploration import OUNoise
+from her.algorithms import DDPG, DDPGC, DDPG_GAR
+from her.experience import ReplayMemory, Transition, Normalizer
+from her.exploration import Noise
 from her.utils import Saver, Summarizer, get_noise_scale, get_params, running_mean
+from her.agents.basic import Actor 
+from her.agents.basic import CriticReg as Critic
 
 import pdb
 
+import matplotlib
+import matplotlib.pyplot as plt
+
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
 dtype = K.float32
-
 
 def init(config):
     
@@ -47,6 +51,8 @@ def init(config):
     NORMALIZED_REWARDS = config['reward_normalization'] # True
 
     env = gym.make(ENV_NAME)
+    env.seed(SEED)
+
     observation_space = env.observation_space.spaces['observation'].shape[0] + env.observation_space.spaces['desired_goal'].shape[0]
     action_space = env.action_space
     if env.action_space.low[0] == -1 and env.action_space.high[0] == 1:
@@ -56,21 +62,11 @@ def init(config):
     else:
         OUT_FUNC = K.sigmoid
 
-    env.seed(SEED)
     K.manual_seed(SEED)
     np.random.seed(SEED)
     
-    if config['agent_alg'] == 'DDPG':
-        MODEL = DDPG
-    elif config['agent_alg'] == 'DDPGC':
-        MODEL = DDPGC
-        
-    if config['agent_type'] == 'basic':
-        from macomm.agents.basic import Actor 
-        from macomm.agents.basic import Critic
-    elif config['agent_type'] == 'deep':
-        from macomm.agents.deep import Actor, Critic
-    
+    MODEL = DDPG_GAR
+
     if config['verbose'] > 1:
         # utils
         summaries = (Summarizer(config['dir_summary_train'], config['port'], config['resume']),
@@ -81,7 +77,8 @@ def init(config):
         saver = None
 
     #exploration initialization
-    ounoise = OUNoise(action_space.shape[0])
+    noise = Noise(action_space.shape[0], sigma=0.2, eps=0.3)
+    #noise = OUNoise(action_space.shape[0])
 
     #model initialization
     optimizer = (optim.Adam, (ACTOR_LR, CRITIC_LR)) # optimiser func, (actor_lr, critic_lr)
@@ -97,89 +94,190 @@ def init(config):
     #memory initilization
     memory = ReplayMemory(MEM_SIZE)
 
-    experiment_args = (env, memory, ounoise, config, summaries, saver, start_episode)
+    normalizer = (Normalizer(), Normalizer(pre_norm_clip=200000, post_norm_clip=200000), Normalizer(pre_norm_clip=200000, post_norm_clip=200000))
+
+    experiment_args = (env, memory, noise, config, summaries, saver, start_episode, normalizer)
           
     return model, experiment_args
+
+def rollout(env, model, noise, normalizer=None, render=False):
+    trajectory = []
+
+    # monitoring variables
+    episode_reward = 0
+    frames = []
+    
+    state = env.reset()
+    
+    for i_step in range(env._max_episode_steps):
+
+        model.to_cpu()
+
+        obs = K.tensor(state['observation'], dtype=K.float32).unsqueeze(0)
+        goal = K.tensor(state['desired_goal'], dtype=K.float32).unsqueeze(0)
+
+        obs_goal = K.cat([obs, goal], dim=-1)
+        # Observation normalization
+        if normalizer[0] is not None:
+            obs_goal = normalizer[0].preprocess_with_update(obs_goal)
+            #_ = normalizer.preprocess_with_update(obs_goal)
+
+        action = model.select_action(obs_goal, noise)
+
+        next_state, reward, done, info = env.step(action.squeeze(0).numpy())
+        reward = K.tensor(reward, dtype=dtype).view(1,1)
+        if normalizer[1] is not None:
+            reward = normalizer[1].preprocess_with_update(reward)
+
+        # for monitoring
+        episode_reward += reward
+
+        trajectory.append((state, action, reward, next_state, done))
+
+        # Move to the next state
+        state = next_state
+
+        # Record frames
+        if render:
+            frames.append(env.render(mode='rgb_array')[0])
+
+    return trajectory, episode_reward, info['is_success'], frames
+
+# set up matplotlib
+is_ipython = 'inline' in matplotlib.get_backend()
+if is_ipython:
+    from IPython import display
+
+plt.ion()
+
+def plot_durations(p, r):
+    plt.figure(2)
+    plt.clf()
+    plt.title('Training...')
+    plt.xlabel('Episode')
+    plt.ylabel('Duration')
+    plt.plot(p)
+    plt.plot(r)
+
+    plt.pause(0.001)  # pause a bit so that plots are updated
+    if is_ipython:
+        display.clear_output(wait=True)
+        display.display(plt.gcf())
 
 def run(model, experiment_args, train=True):
 
     total_time_start =  time.time()
 
-    env, memory, ounoise, config, summaries, saver, start_episode = experiment_args
+    env, memory, noise, config, summaries, saver, start_episode, normalizer = experiment_args
     
     start_episode = start_episode if train else 0
     NUM_EPISODES = config['n_episodes'] if train else config['n_episodes_test'] 
-    EPISODE_LENGTH = config['episode_length'] if train else config['episode_length_test'] 
+    EPISODE_LENGTH = env._max_episode_steps #config['episode_length'] if train else config['episode_length_test'] 
     
-    t = 0
     episode_reward_all = []
+    episode_success_all = []
         
     for i_episode in range(start_episode, NUM_EPISODES):
         
         episode_time_start = time.time()
-        
-        frames = []
-        
-        # Initialize the environment and state
-        state = env.reset()
-        observation = state['observation']
-        achieved_goal = state['achieved_goal']
-        desired_goal = state['desired_goal']
-
-        observation = K.tensor(observation, dtype=K.float32).unsqueeze(0)
-        achieved_goal = K.tensor(achieved_goal, dtype=K.float32).unsqueeze(0)
-        desired_goal = K.tensor(desired_goal, dtype=K.float32).unsqueeze(0)
-
-        ounoise.scale = get_noise_scale(i_episode, config)
-        
-        # monitoring variables
-        episode_reward = 0
-        
-        for i_step in range(EPISODE_LENGTH):
-
-            model.to_cpu()
-            action = model.select_action(K.cat([observation, desired_goal], dim=-1), ounoise if train else False)
-
-            next_observation, reward, done, info = env.step(action.squeeze(0))
-            next_observation = K.tensor(next_observation, dtype=dtype).unsqueeze(0)
-            reward = K.tensor(reward, dtype=dtype).view(1,1)
-
-            # for monitoring
-            episode_reward += reward
-
-            # if it is the last step we don't need next obs
-            if i_step == EPISODE_LENGTH-1:
-                next_observation = None
-
-            # Store the transition in memory
-            if train:
-                memory.push(observation, action, next_observation, reward)
-
-            # Move to the next state
-            observation = next_observation
-            t += 1
+        #noise.scale = get_noise_scale(i_episode, config)
+        if train:
+            for i_cycle in range(5):
             
-            # Use experience replay and train the model
-            if train:
-                if len(memory) > config['batch_size']-1 and t%config['steps_per_update'] == 0:
-                    model.to_cuda()        
-                    batch = Transition(*zip(*memory.sample(config['batch_size'])))
-                    critic_loss, actor_loss = model.update_parameters(batch)
+                trajectories = []
+                for i_rollout in range(38):
+                    # Initialize the environment and state
+                    trajectory, _, _, _ = rollout(env, model, noise, normalizer, render=0)
+                    trajectories.append(trajectory)
 
+                for trajectory in trajectories:
+
+                    for i_step in range(len(trajectory)):
+                        state, action, reward, next_state, done = trajectory[i_step]
                         
-            # Record frames
+                        obs = K.tensor(state['observation'], dtype=K.float32).unsqueeze(0)
+                        goal = K.tensor(state['desired_goal'], dtype=K.float32).unsqueeze(0)
+
+                        next_obs = K.tensor(next_state['observation'], dtype=K.float32).unsqueeze(0)
+                        next_achieved = K.tensor(next_state['achieved_goal'], dtype=K.float32).unsqueeze(0)
+                        
+                        # regular sample
+                        obs_goal = K.cat([obs, goal], dim=-1)
+                        if done:
+                            next_obs_goal = None
+                        else:
+                            next_obs_goal = K.cat([next_obs, goal], dim=-1)
+                        
+                        memory.push(obs_goal, action, next_obs_goal, reward)
+                        # HER sample 
+                        for _ in range(4):
+                            future = np.random.randint(i_step, len(trajectory))
+                            _, _, _, next_state, _ = trajectory[future]
+                            aux_goal = K.tensor(next_state['achieved_goal'], dtype=K.float32).unsqueeze(0)
+
+                            obs_goal = K.cat([obs, aux_goal], dim=-1)
+
+                            if done:
+                                next_obs_goal = None
+                            else:
+                                next_obs_goal = K.cat([next_obs, aux_goal], dim=-1)
+                                
+                            reward = env.compute_reward(next_achieved, aux_goal, None)
+                            reward = K.tensor(reward, dtype=dtype).view(1,1)
+                            if normalizer[1] is not None:
+                                reward = normalizer[1].preprocess_with_update(reward)
+                            
+                            memory.push(obs_goal, action, next_obs_goal, reward) 
+                    # <-- end loop: i_step
+                # <-- end loop: i_rollout 
+
+                for _ in range(100):
+                    if len(memory) > config['batch_size']-1:#1023:
+                        
+                        model.to_cuda()  
+                        batch = Transition(*zip(*memory.sample(1024)))
+                        forward_loss, forward_reg = model.update_forward(batch, normalizer)
+
+                if len(memory) > 1023:
+                    print(forward_loss)
+                    print(forward_reg)
+
+                for _ in range(40):
+                    if len(memory) > config['batch_size']-1:
+                        
+                        model.to_cuda()  
+                        batch = Transition(*zip(*memory.sample(config['batch_size'])))
+                        critic_loss, actor_loss, p, r, M = model.update_parameters(batch, normalizer)
+
+                plot_durations(p, r)
+
+                #print(normalizer.get_stats())
+
+            # <-- end loop: i_cycle
+        #pdb.set_trace()
+        episode_reward_cycle = []
+        episode_succeess_cycle = []
+        for i_rollout in range(20):
+            # Initialize the environment and state
+            render = config['render'] > 0 and i_episode % config['render'] == 0
+            _, episode_reward, success, frames = rollout(env, model, noise=False, normalizer=normalizer, render=render)
+                
+            # Save gif
+            dir_monitor = config['dir_monitor_train'] if train else config['dir_monitor_test']
             if config['render'] > 0 and i_episode % config['render'] == 0:
-                frames.append(env.render(mode='rgb_array')[0]) 
+                imageio.mimsave('{}/{}.gif'.format(dir_monitor, i_episode), frames)
 
-        # <-- end loop: i_step 
-
+            episode_reward_cycle.append(episode_reward)
+            episode_succeess_cycle.append(success)
+        # <-- end loop: i_rollout 
+            
         ### MONITORIRNG ###
-
-        episode_reward_all.append(episode_reward)
+        episode_reward_all.append(np.mean(episode_reward_cycle))
+        episode_success_all.append(np.mean(episode_succeess_cycle))
         
         if config['verbose'] > 0:
         # Printing out
-            if (i_episode+1)%100 == 0:
+            if (i_episode+1)%1 == 0:
                 print("==> Episode {} of {}".format(i_episode + 1, NUM_EPISODES))
                 print('  | Id exp: {}'.format(config['exp_id']))
                 print('  | Exp description: {}'.format(config['exp_descr']))
@@ -187,7 +285,9 @@ def run(model, experiment_args, train=True):
                 print('  | Process pid: {}'.format(config['process_pid']))
                 print('  | Tensorboard port: {}'.format(config['port']))
                 print('  | Episode total reward: {}'.format(episode_reward))
-                print('  | Running mean of total reward: {}'.format(running_mean(episode_reward_all)[-1]))
+                print('  | Running mean of total reward: {}'.format(episode_reward_all[-1]))
+                print('  | Success rate: {}'.format(episode_success_all[-1]))
+                #print('  | Running mean of total reward: {}'.format(running_mean(episode_reward_all)[-1]))
                 print('  | Time episode: {}'.format(time.time()-episode_time_start))
                 print('  | Time total: {}'.format(time.time()-total_time_start))
                         
@@ -218,13 +318,7 @@ def run(model, experiment_args, train=True):
             #                    )
         
 
-        # Save gif
-        dir_monitor = config['dir_monitor_train'] if train else config['dir_monitor_test']
-        if config['render'] > 0 and i_episode % config['render'] == 0:
-            if config['env_id'] == 'waterworld':
-                imageio.mimsave('{}/{}.gif'.format(dir_monitor, i_episode), frames[0::3])
-            else:
-                imageio.mimsave('{}/{}.gif'.format(dir_monitor, i_episode), frames)
+
             
     # <-- end loop: i_episode
     if train:
