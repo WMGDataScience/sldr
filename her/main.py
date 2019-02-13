@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
-import gym
+import gym_wmgds as gym
 
 from her.algorithms import DDPG, DDPGC
 from her.experience import ReplayMemory, Transition, Normalizer
