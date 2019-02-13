@@ -107,32 +107,24 @@ class DDPG(object):
         r = K.cat(batch.reward, dim=0).to(self.device)
         s_ = K.cat([i.to(self.device) for i in batch.next_state if i is not None], dim=0)
         a_ = K.zeros_like(a)[:,0:s_.shape[0],]
+        
+        if normalizer[0] is not None:
+            s = normalizer[0].preprocess(s)
+            s_ = normalizer[0].preprocess(s_)
 
         if self.normalized_rewards:
-            r -= r.mean()
-            r /= r.std()
+            if normalizer[1] is not None:
+                r = r
+                #r = normalizer[1].preprocess(r)
+            else:
+                r -= r.mean()
+                r /= r.std()
         
-        if normalizer is not None:
-            s = normalizer.preprocess(s)
-            s_ = normalizer.preprocess(s_)
-        
-        Q = self.critics[0](s, a)
-
-        #Z = self.critics[0].z
-        #B = F.relu(Z)
-        #M = K.matmul(B, B.t())
-        #M = M/(M.max(1)[0].unsqueeze(1))
-        #p = 1 - M.mean(1).unsqueeze(1)
-        
+        Q = self.critics[0](s, a)        
         a_ = self.actors_target[0](s_)
-
         V[mask] = self.critics_target[0](s_, a_).detach()
 
         loss_critic = self.loss_func(Q, (V * self.gamma) + r)
-        #pdb.set_trace()
-        #reg_critic =  self.critics[0].GAR(1, 1, 0.000001)
-
-        #loss_critic += reg_critic
 
         self.critics_optim[0].zero_grad()
         loss_critic.backward()
@@ -141,7 +133,7 @@ class DDPG(object):
 
         a = self.actors[0](s)
 
-        loss_actor = -self.critics[0](s, a).mean() #- self.critics[0].GAR(1, 1, 0.000001)
+        loss_actor = -self.critics[0](s, a).mean()
         
         if self.regularization:
             loss_actor += (self.actors[0].get_preactivations(s)**2).mean()*1
@@ -154,7 +146,6 @@ class DDPG(object):
         soft_update(self.actors_target[0], self.actors[0], self.tau)
         soft_update(self.critics_target[0], self.critics[0], self.tau)
 
-        
         return loss_critic.item(), loss_actor.item()
 
 
