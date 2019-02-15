@@ -15,7 +15,7 @@ from her.experience import ReplayMemory, Transition, Normalizer
 from her.exploration import Noise
 from her.utils import Saver, Summarizer, get_noise_scale, get_params, running_mean
 from her.agents.basic import Actor 
-from her.agents.basic import CriticReg as Critic
+from her.agents.basic import Critic
 
 import pdb
 
@@ -94,7 +94,7 @@ def init(config):
     #memory initilization
     memory = ReplayMemory(MEM_SIZE)
 
-    normalizer = (Normalizer(), Normalizer(pre_norm_clip=200000, post_norm_clip=200000), Normalizer(pre_norm_clip=200000, post_norm_clip=200000))
+    normalizer = (Normalizer(), None)
 
     experiment_args = (env, memory, noise, config, summaries, saver, start_episode, normalizer)
           
@@ -110,6 +110,7 @@ def rollout(env, model, noise, normalizer=None, render=False, nb_objects=1):
     env.env.nb_objects = nb_objects
     state = env.reset()
     achieved_init = state['achieved_goal']
+    moved_step = np.ones(nb_objects) * -1
     
     for i_step in range(env._max_episode_steps):
 
@@ -133,8 +134,7 @@ def rollout(env, model, noise, normalizer=None, render=False, nb_objects=1):
 
         # for monitoring
         episode_reward += reward
-
-        trajectory.append((state, action, reward, next_state, done))
+        trajectory.append((state.copy(), action, reward, next_state.copy(), done))
 
         # Move to the next state
         state = next_state
@@ -143,10 +143,19 @@ def rollout(env, model, noise, normalizer=None, render=False, nb_objects=1):
         if render:
             frames.append(env.render(mode='rgb_array')[0])
         
-    achieved_final = state['achieved_goal']
-    moved_index = np.concatenate((K.zeros(1), np.where((achieved_init[1::] != achieved_final[1::]).all(axis=1))[0]+1)).astype(int)
+        achieved_final = state['achieved_goal']
+        moved_step[np.where(np.logical_and(np.linalg.norm((achieved_init - achieved_final), axis=1) > 1e-4, moved_step==-1))[0]] = i_step
 
-    return trajectory, episode_reward, info['is_success'], frames, moved_index
+    achieved_final = state['achieved_goal']
+    #moved_index = np.concatenate((K.zeros(1), np.where((achieved_init[1::] != achieved_final[1::]).all(axis=1))[0]+1)).astype(int)
+    moved_index = np.where(np.linalg.norm((achieved_init - achieved_final), axis=1) > 1e-4)[0]
+
+    if render:
+        print(moved_index)
+        print(moved_step)
+
+
+    return trajectory, episode_reward, info['is_success'], frames, (moved_index, moved_step)
 
 def run(model, experiment_args, train=True):
 
@@ -168,56 +177,66 @@ def run(model, experiment_args, train=True):
         episode_time_start = time.time()
         #noise.scale = get_noise_scale(i_episode, config)
         if train:
-            for i_cycle in range(5):
+            for i_cycle in range(50):
             
                 trajectories = []
                 moved_indices = []
+                moved_steps = []
                 for i_rollout in range(38):
                     # Initialize the environment and state
                     nb_objects = np.random.randint(1, max_nb_objects+1)
-                    trajectory, _, _, _, moved_index = rollout(env, model, noise, normalizer, render=(i_rollout==37), nb_objects=nb_objects)
+                    trajectory, _, _, _, moved = rollout(env, model, noise, normalizer, render=(i_rollout==37), nb_objects=nb_objects)
+                    moved_index, moved_step = moved
                     trajectories.append(trajectory)
                     moved_indices.append(moved_index)
+                    moved_steps.append(moved_step)
 
-                for trajectory, moved_index in zip(trajectories, moved_indices):
+                for trajectory, moved_index, moved_step in zip(trajectories, moved_indices, moved_steps):
 
                     for i_step in range(len(trajectory)):
                         state, action, reward, next_state, done = trajectory[i_step]
                         
+                        obs = K.tensor(state['observation'][0], dtype=K.float32).unsqueeze(0)
+                        goal = K.tensor(state['desired_goal'], dtype=K.float32).unsqueeze(0)
+
+                        next_obs = K.tensor(next_state['observation'][0], dtype=K.float32).unsqueeze(0)
+                        next_achieved = K.tensor(next_state['achieved_goal'][0], dtype=K.float32).unsqueeze(0)
+                        
+                        # regular sample
+                        obs_goal = K.cat([obs, goal], dim=-1)
+                        if done:
+                            next_obs_goal = None
+                        else:
+                            next_obs_goal = K.cat([next_obs, goal], dim=-1)
+                        
+                        memory.push(obs_goal, action, next_obs_goal, reward)
+                        
                         for i_object in moved_index:
-                            obs = K.tensor(state['observation'][i_object], dtype=K.float32).unsqueeze(0)
-                            goal = K.tensor(state['desired_goal'], dtype=K.float32).unsqueeze(0)
-
-                            next_obs = K.tensor(next_state['observation'][i_object], dtype=K.float32).unsqueeze(0)
-                            next_achieved = K.tensor(next_state['achieved_goal'][i_object], dtype=K.float32).unsqueeze(0)
-                            
-                            # regular sample
-                            obs_goal = K.cat([obs, goal], dim=-1)
-                            if done:
-                                next_obs_goal = None
-                            else:
-                                next_obs_goal = K.cat([next_obs, goal], dim=-1)
-                            
-                            memory.push(obs_goal, action, next_obs_goal, reward)
                             # HER sample 
-                            for _ in range(4):
-                                future = np.random.randint(i_step, len(trajectory))
-                                _, _, _, next_state, _ = trajectory[future]
-                                aux_goal = K.tensor(next_state['achieved_goal'][i_object], dtype=K.float32).unsqueeze(0)
-
-                                obs_goal = K.cat([obs, aux_goal], dim=-1)
-
-                                if done:
-                                    next_obs_goal = None
-                                else:
-                                    next_obs_goal = K.cat([next_obs, aux_goal], dim=-1)
-                                    
-                                reward = env.compute_reward(next_achieved, aux_goal, None)
-                                reward = K.tensor(reward, dtype=dtype).view(1,1)
-                                if normalizer[1] is not None:
-                                    reward = normalizer[1].preprocess_with_update(reward)
+                            if i_step >= moved_step[moved_index][0]:
+                                obs = K.tensor(state['observation'][i_object], dtype=K.float32).unsqueeze(0)
                                 
-                                memory.push(obs_goal, action, next_obs_goal, reward)
+                                next_obs = K.tensor(next_state['observation'][i_object], dtype=K.float32).unsqueeze(0)
+                                next_achieved = K.tensor(next_state['achieved_goal'][i_object], dtype=K.float32).unsqueeze(0)
+
+                                for _ in range(4):
+                                    future = np.random.randint(i_step, len(trajectory))
+                                    _, _, _, next_state, _ = trajectory[future]
+                                    aux_goal = K.tensor(next_state['achieved_goal'][i_object], dtype=K.float32).unsqueeze(0)
+
+                                    obs_goal = K.cat([obs, aux_goal], dim=-1)
+
+                                    if done:
+                                        next_obs_goal = None
+                                    else:
+                                        next_obs_goal = K.cat([next_obs, aux_goal], dim=-1)
+                                        
+                                    reward = env.compute_reward(next_achieved, aux_goal, None)
+                                    reward = K.tensor(reward, dtype=dtype).view(1,1)
+                                    if normalizer[1] is not None:
+                                        reward = normalizer[1].preprocess_with_update(reward)
+                                    
+                                    memory.push(obs_goal, action, next_obs_goal, reward)
                             # <-- end loop: i_her         
                         # <-- end loop: i_object           
                     # <-- end loop: i_step
@@ -253,6 +272,8 @@ def run(model, experiment_args, train=True):
         ### MONITORIRNG ###
         episode_reward_all.append(np.mean(episode_reward_cycle))
         episode_success_all.append(np.mean(episode_succeess_cycle))
+
+        plot_durations(np.asarray(episode_reward_all), np.asarray(episode_success_all))
         
         if config['verbose'] > 0:
         # Printing out
@@ -304,6 +325,26 @@ def run(model, experiment_args, train=True):
     
     return episode_reward_all
 
+# set up matplotlib
+is_ipython = 'inline' in matplotlib.get_backend()
+if is_ipython:
+    from IPython import display
+
+plt.ion()
+
+def plot_durations(p, r):
+    plt.figure(2)
+    plt.clf()
+    plt.title('Training...')
+    plt.xlabel('Episode')
+    plt.ylabel('Duration')
+    plt.plot(p)
+    plt.plot(r)
+
+    plt.pause(0.001)  # pause a bit so that plots are updated
+    if is_ipython:
+        display.clear_output(wait=True)
+        display.display(plt.gcf())
 
 if __name__ == '__main__':
 
