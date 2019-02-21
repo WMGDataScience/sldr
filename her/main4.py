@@ -110,7 +110,6 @@ def rollout(env, model, noise, normalizer=None, render=False, nb_objects=1):
     env.env.nb_objects = nb_objects
     state = env.reset()
     achieved_init = state['achieved_goal']
-    moved_step = np.ones(nb_objects) * -1
     
     for i_step in range(env._max_episode_steps):
 
@@ -143,19 +142,18 @@ def rollout(env, model, noise, normalizer=None, render=False, nb_objects=1):
         if render:
             frames.append(env.render(mode='rgb_array')[0])
         
-        achieved_final = state['achieved_goal']
-        moved_step[np.where(np.logical_and(np.linalg.norm((achieved_init - achieved_final), axis=1) > 1e-4, moved_step==-1))[0]] = i_step
+        #achieved_final = state['achieved_goal']
+        #moved_step[np.where(np.logical_and(np.linalg.norm((achieved_init - achieved_final), axis=1) > 1e-4, moved_step==-1))[0]] = i_step
 
     achieved_final = state['achieved_goal']
-    #moved_index = np.concatenate((K.zeros(1), np.where((achieved_init[1::] != achieved_final[1::]).all(axis=1))[0]+1)).astype(int)
-    moved_index = np.where(np.linalg.norm((achieved_init - achieved_final), axis=1) > 1e-4)[0]
+    moved_index = np.concatenate((K.zeros(1), np.where((achieved_init[1::] != achieved_final[1::]).all(axis=1))[0]+1)).astype(int)
+    #moved_index = np.where(np.linalg.norm((achieved_init - achieved_final), axis=1) > 1e-4)[0]
 
     if render:
         print(moved_index)
-        print(moved_step)
 
 
-    return trajectory, episode_reward, info['is_success'], frames, (moved_index, moved_step)
+    return trajectory, episode_reward, info['is_success'], frames, moved_index
 
 def run(model, experiment_args, train=True):
 
@@ -169,8 +167,10 @@ def run(model, experiment_args, train=True):
     
     episode_reward_all = []
     episode_success_all = []
+    critic_losses = []
+    actor_losses = []
     
-    max_nb_objects = 10
+    max_nb_objects = config['max_nb_objects']
         
     for i_episode in range(start_episode, NUM_EPISODES):
         
@@ -181,77 +181,95 @@ def run(model, experiment_args, train=True):
             
                 trajectories = []
                 moved_indices = []
-                moved_steps = []
-                for i_rollout in range(38):
+                for i_rollout in range(1):
                     # Initialize the environment and state
                     nb_objects = np.random.randint(1, max_nb_objects+1)
-                    trajectory, _, _, _, moved = rollout(env, model, noise, normalizer, render=(i_rollout==37), nb_objects=nb_objects)
-                    moved_index, moved_step = moved
+                    trajectory, _, _, _, moved_index = rollout(env, model, noise, normalizer, render=(i_cycle%10==1000), nb_objects=nb_objects)
                     trajectories.append(trajectory)
                     moved_indices.append(moved_index)
-                    moved_steps.append(moved_step)
 
-                for trajectory, moved_index, moved_step in zip(trajectories, moved_indices, moved_steps):
+                for trajectory, moved_index in zip(trajectories, moved_indices):
 
-                    for i_step in range(len(trajectory)):
-                        state, action, reward, next_state, done = trajectory[i_step]
+                    T = len(trajectory) - 1
+                    t_samples = np.random.randint(T, size=(max_nb_objects,T))
+                    future_offset = np.random.uniform(size=(max_nb_objects,T)) * (T - t_samples)
+                    future_offset = future_offset.astype(int)
+                    her_sample = (np.random.uniform(size=(max_nb_objects,T)) < 0.8)
+                    future_t = (t_samples + 1 + future_offset)
+                    
+                    # for i_step in range(len(trajectory)):
+                    #     state, action, reward, next_state, done = trajectory[i_step]
                         
-                        obs = K.tensor(state['observation'][0], dtype=K.float32).unsqueeze(0)
-                        goal = K.tensor(state['desired_goal'], dtype=K.float32).unsqueeze(0)
+                    #     obs = K.tensor(state['observation'][0], dtype=K.float32).unsqueeze(0)
+                    #     goal = K.tensor(state['desired_goal'], dtype=K.float32).unsqueeze(0)
 
-                        next_obs = K.tensor(next_state['observation'][0], dtype=K.float32).unsqueeze(0)
-                        next_achieved = K.tensor(next_state['achieved_goal'][0], dtype=K.float32).unsqueeze(0)
+                    #     next_obs = K.tensor(next_state['observation'][0], dtype=K.float32).unsqueeze(0)
+                    #     next_achieved = K.tensor(next_state['achieved_goal'][0], dtype=K.float32).unsqueeze(0)
                         
-                        # regular sample
-                        obs_goal = K.cat([obs, goal], dim=-1)
-                        if done:
-                            next_obs_goal = None
-                        else:
-                            next_obs_goal = K.cat([next_obs, goal], dim=-1)
+                    #     # regular sample
+                    #     obs_goal = K.cat([obs, goal], dim=-1)
+                    #     if done:
+                    #         next_obs_goal = None
+                    #     else:
+                    #         next_obs_goal = K.cat([next_obs, goal], dim=-1)
                         
-                        memory.push(obs_goal, action, next_obs_goal, reward)
-                        
-                        for i_object in moved_index:
-                            # HER sample 
-                            if i_step >= moved_step[moved_index][0]:
-                                obs = K.tensor(state['observation'][i_object], dtype=K.float32).unsqueeze(0)
-                                
-                                next_obs = K.tensor(next_state['observation'][i_object], dtype=K.float32).unsqueeze(0)
-                                next_achieved = K.tensor(next_state['achieved_goal'][i_object], dtype=K.float32).unsqueeze(0)
-
-                                for _ in range(4):
-                                    future = np.random.randint(i_step, len(trajectory))
-                                    _, _, _, next_state, _ = trajectory[future]
-                                    aux_goal = K.tensor(next_state['achieved_goal'][i_object], dtype=K.float32).unsqueeze(0)
-
-                                    obs_goal = K.cat([obs, aux_goal], dim=-1)
-
-                                    if done:
-                                        next_obs_goal = None
-                                    else:
-                                        next_obs_goal = K.cat([next_obs, aux_goal], dim=-1)
-                                        
-                                    reward = env.compute_reward(next_achieved, aux_goal, None)
-                                    reward = K.tensor(reward, dtype=dtype).view(1,1)
-                                    if normalizer[1] is not None:
-                                        reward = normalizer[1].preprocess_with_update(reward)
-                                    
-                                    memory.push(obs_goal, action, next_obs_goal, reward)
-                            # <-- end loop: i_her         
-                        # <-- end loop: i_object           
+                    #     memory.push(obs_goal, action, next_obs_goal, reward)
                     # <-- end loop: i_step
+                    
+                    for i_object in moved_index:
+                        for i_step in t_samples[i_object]:
+                            state, action, reward, next_state, done = trajectory[i_step]
+
+                            #pdb.set_trace()
+                            obs = K.tensor(state['observation'][i_object], dtype=K.float32).unsqueeze(0)
+                            goal = K.tensor(state['desired_goal'], dtype=K.float32).unsqueeze(0)
+                                
+                            next_obs = K.tensor(next_state['observation'][i_object], dtype=K.float32).unsqueeze(0)
+                            next_achieved = K.tensor(next_state['achieved_goal'][i_object], dtype=K.float32).unsqueeze(0)
+
+                            if her_sample[i_object, i_step]:
+                                _, _, _, next_state, _ = trajectory[future_t[i_object, i_step]]
+                                aux_goal = K.tensor(next_state['achieved_goal'][i_object], dtype=K.float32).unsqueeze(0)
+                                obs_goal = K.cat([obs, aux_goal], dim=-1)
+
+                                if done:
+                                    next_obs_goal = None
+                                else:
+                                    next_obs_goal = K.cat([next_obs, aux_goal], dim=-1)
+                                        
+                                reward = env.compute_reward(next_achieved, aux_goal, None)
+                                reward = K.tensor(reward, dtype=dtype).view(1,1)
+                                if normalizer[1] is not None:
+                                    reward = normalizer[1].preprocess_with_update(reward)
+                            else:
+                                # regular sample
+                                obs_goal = K.cat([obs, goal], dim=-1)
+                                if done:
+                                    next_obs_goal = None
+                                else:
+                                    next_obs_goal = K.cat([next_obs, goal], dim=-1)
+                                    
+                            memory.push(obs_goal, action, next_obs_goal, reward)    
+                        # <-- end loop: i_step
+                    # <-- end loop: i_object  
                 # <-- end loop: i_rollout 
 
-                for _ in range(40):
+                for i_batch in range(40):
                     if len(memory) > config['batch_size']-1:
                         
                         model.to_cuda()  
                         batch = Transition(*zip(*memory.sample(config['batch_size'])))
                         critic_loss, actor_loss = model.update_parameters(batch, normalizer)
 
+                        if i_batch == 39:
+                            critic_losses.append(critic_loss)
+                            actor_losses.append(actor_loss)
+
                 #print(normalizer.get_stats())
 
             # <-- end loop: i_cycle
+        
+        plot_durations(np.asarray(critic_losses), np.asarray(actor_losses))
         #pdb.set_trace()
         episode_reward_cycle = []
         episode_succeess_cycle = []

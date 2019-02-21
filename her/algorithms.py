@@ -124,7 +124,11 @@ class DDPG(object):
         a_ = self.actors_target[0](s_)
         V[mask] = self.critics_target[0](s_, a_).detach()
 
-        loss_critic = self.loss_func(Q, (V * self.gamma) + r)
+        #loss_critic = self.loss_func(Q, (V * self.gamma) + r)
+        target_Q = (V * self.gamma) + r
+        target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
+        
+        loss_critic = self.loss_func(Q, target_Q)
 
         self.critics_optim[0].zero_grad()
         loss_critic.backward()
@@ -136,7 +140,8 @@ class DDPG(object):
         loss_actor = -self.critics[0](s, a).mean()
         
         if self.regularization:
-            loss_actor += (self.actors[0].get_preactivations(s)**2).mean()*1
+            #loss_actor += (self.actors[0].get_preactivations(s)**2).mean()*1
+            loss_actor += (self.actors[0](s)**2).mean()*1
 
         self.actors_optim[0].zero_grad()        
         loss_actor.backward()

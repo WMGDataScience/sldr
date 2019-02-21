@@ -142,6 +142,9 @@ def get_params(args=[], verbose=False):
     parser.add_argument('--verbose', default=1, type=int,\
                          help='monitoring level')
 
+    parser.add_argument('--max_nb_objects', default=1, type=int,\
+                         help='number of objects to be used in the training')
+
 
     # acquire in a dict
     config = parser.parse_args(args)
