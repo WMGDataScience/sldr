@@ -58,7 +58,7 @@ class Normalizer(object):
         #normalising
         mu, std = self.get_stats()
         x -= K.tensor(mu, dtype=x.dtype, device=x.device)
-        x /= (K.tensor(std, dtype=x.dtype, device=x.device)  + 1e-8)
+        x /= (K.tensor(std, dtype=x.dtype, device=x.device)  + 1e-2)
         #post-normalisation clipping
         x = x.clamp(-self.post_norm_clip, self.post_norm_clip)
 
@@ -71,7 +71,7 @@ class Normalizer(object):
         #normalising
         mu, std = self.get_stats()
         x -= K.tensor(mu, dtype=x.dtype, device=x.device)
-        x /= (K.tensor(std, dtype=x.dtype, device=x.device)  + 1e-8)
+        x /= (K.tensor(std, dtype=x.dtype, device=x.device)  + 1e-2)
         #post-normalisation clipping
         x = x.clamp(-self.post_norm_clip, self.post_norm_clip)
 
