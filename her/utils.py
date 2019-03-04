@@ -138,12 +138,19 @@ def get_params(args=[], verbose=False):
                         choices=['True', 'False'],
                         help="discrete actions")
 
-
     parser.add_argument('--verbose', default=1, type=int,\
                          help='monitoring level')
 
     parser.add_argument('--max_nb_objects', default=1, type=int,\
                          help='number of objects to be used in the training')
+
+    parser.add_argument('--ai_object_rate', default=0.10, type=float,\
+                         help='the probability of intelligent object')
+
+    parser.add_argument('--obj_action_type', default='slide_only', type=str,
+                         choices=['all', 'slide_only', 'rotation_only'],
+                         help='the type objects actions')
+    
 
 
     # acquire in a dict
