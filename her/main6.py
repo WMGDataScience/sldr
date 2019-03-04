@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms3 import MADDPG
+from her.algorithms3 import MADDPG, DDPG, MADDPG_R
 from her.experience import Normalizer
 from her.replay_buffer import ReplayBuffer
 from her.her_sampler import make_sample_her_transitions
@@ -79,7 +79,12 @@ def init(config):
     K.manual_seed(SEED)
     np.random.seed(SEED)
     
-    MODEL = MADDPG
+    if config['agent_alg'] == 'MADDPG':
+        MODEL = MADDPG
+    elif config['agent_alg'] == 'DDPG':
+        MODEL = DDPG
+    elif config['agent_alg'] == 'MADDPG_R':
+        MODEL = MADDPG_R             
 
     if config['verbose'] > 1:
         # utils
@@ -152,7 +157,6 @@ def rollout(env, model, noise, normalizer=None, render=False, ai_object=False):
             obs_goal = normalizer[0].preprocess_with_update(obs_goal)
 
         action = model.select_action(obs_goal, 0, noise[0]).cpu().numpy().squeeze(0)
-        action *= 0.00 
 
         # get the action of the object
         obs2 = K.tensor(state_all['observation'][1], dtype=K.float32).unsqueeze(0)
@@ -229,6 +233,8 @@ def run(model, experiment_args, train=True):
     episode_success_all = []
     critic_losses = []
     actor_losses = []
+    critic_losses_obj = []
+    actor_losses_obj = []
         
     for i_episode in range(start_episode, NUM_EPISODES):
         
@@ -240,16 +246,22 @@ def run(model, experiment_args, train=True):
                 for i_rollout in range(38):
                     # Initialize the environment and state
                     ai_object = 1 if np.random.rand() < config['ai_object_rate']  else 0 #np.random.randint(2)
-                    trajectories, _, _, _ = rollout(env, model, noise, normalizer, render=(i_rollout!=370), ai_object=ai_object)
+                    trajectories, _, _, _ = rollout(env, model, noise, normalizer, render=(i_rollout==37), ai_object=ai_object)
                     memory.store_episode(trajectories.copy())   
               
                 for i_batch in range(40):  
                     model.to_cuda()  
                     batch = memory.sample(config['batch_size'])
-                    critic_loss, actor_loss = model.update_parameters(batch, normalizer)
+                    critic_loss_robot, actor_loss_robot = model.update_parameters(batch, 0, normalizer)
+
+                    batch = memory.sample(config['batch_size'])
+                    critic_loss_obj, actor_loss_obj = model.update_parameters(batch, 1, normalizer)
+
                     if i_batch == 39:
-                        critic_losses.append(critic_loss)
-                        actor_losses.append(actor_loss)
+                        critic_losses.append(critic_loss_robot)
+                        actor_losses.append(actor_loss_robot)
+                        critic_losses_obj.append(critic_loss_obj)
+                        actor_losses_obj.append(actor_loss_obj)
                 
                 model.update_target()
 
@@ -258,6 +270,7 @@ def run(model, experiment_args, train=True):
             # <-- end loop: i_cycle
         
         plot_durations(np.asarray(critic_losses), np.asarray(actor_losses))
+        plot_durations(np.asarray(critic_losses_obj), np.asarray(actor_losses_obj))
         #pdb.set_trace()
         episode_reward_cycle = []
         episode_succeess_cycle = []
