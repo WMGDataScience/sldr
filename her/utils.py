@@ -95,7 +95,7 @@ def get_params(args=[], verbose=False):
                         help="discount factor")
     parser.add_argument("--agent_alg",
                         default="DDPG", type=str,
-                        choices=['DDPG', 'MADDPG', 'MADDPG_R'])
+                        choices=['DDPG', 'MADDPG', 'MADDPG_R', 'MADDPG_RAE'])
     parser.add_argument("--device", default='cuda',
                         choices=['cpu','cuda'], 
                         help="device type")

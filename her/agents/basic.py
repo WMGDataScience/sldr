@@ -476,3 +476,30 @@ class AutoEncNextReg(nn.Module):
             #p = (p-p.min())/(p.max()-p.min()+1e-8)
             
         return p, M
+
+
+class BackwardDyn(nn.Module):
+    def __init__(self, observation_space, action_space):
+        super(BackwardDyn, self).__init__()
+        
+        input_size = observation_space*2
+        hidden_size = 256
+        output_size = action_space.shape[0]
+
+        BN = nn.BatchNorm1d(input_size)
+        BN.weight.data.fill_(1)
+        BN.bias.data.fill_(0)
+
+        self.FC = nn.Sequential(#BN, 
+                                nn.Linear(input_size, hidden_size), nn.ReLU(True),
+                                nn.Linear(hidden_size, hidden_size), nn.ReLU(True),
+                                nn.Linear(hidden_size, hidden_size), nn.ReLU(True),
+                                nn.Linear(hidden_size, output_size))
+        
+
+    def forward(self, s, s_):
+
+        x = K.cat([s, s_], dim=1)
+        x = self.FC(x)
+
+        return x
