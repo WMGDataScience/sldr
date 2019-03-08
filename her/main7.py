@@ -176,11 +176,14 @@ def rollout(env, model, noise, normalizer=None, render=False, ai_object=False):
         reward = K.tensor(reward, dtype=dtype).view(1,1)
 
         if not ai_object:
-            next_obs2 = K.tensor(next_state_all['observation'][1], dtype=K.float32).unsqueeze(0)
-            next_obs2_goal = K.cat([next_obs2, goal], dim=-1)
-            if normalizer[1] is not None:
-                next_obs2_goal = normalizer[1].preprocess(next_obs2_goal)
-            action2 = model.estimate_obj_action(obs2_goal, next_obs2_goal).cpu().numpy().squeeze(0)
+            #next_obs2 = K.tensor(next_state_all['observation'][1], dtype=K.float32).unsqueeze(0)
+            #next_obs2_goal = K.cat([next_obs2, goal], dim=-1)
+            #if normalizer[1] is not None:
+            #    next_obs2_goal = normalizer[1].preprocess(next_obs2_goal)
+            #action2 = model.estimate_obj_action(obs2_goal, next_obs2_goal).cpu().numpy().squeeze(0)
+            ag = K.tensor(state_all['achieved_goal'], dtype=K.float32).unsqueeze(0)
+            ag_2 = K.tensor(next_state_all['achieved_goal'], dtype=K.float32).unsqueeze(0)
+            action2 = model.estimate_obj_action(ag, ag_2).cpu().numpy().squeeze(0)
         # for monitoring
         episode_reward += reward
 

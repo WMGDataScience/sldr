@@ -152,10 +152,11 @@ class ReplayBuffer_v2:
         buffers['o_2'] = buffers['o'][:, 1:, :]
         buffers['ag_2'] = buffers['ag'][:, 1:, :]
         buffers['o_3'] = buffers['o'][:, 2:, :]
+        buffers['ag_3'] = buffers['ag'][:, 2:, :]
 
         transitions = self.sample_transitions(buffers, batch_size)
 
-        for key in (['r', 'o_2', 'ag_2', 'o_3'] + list(self.buffers.keys())):
+        for key in (['r', 'o_2', 'ag_2', 'o_3', 'ag_3'] + list(self.buffers.keys())):
             assert key in transitions, "key %s missing from transitions" % key
 
         return transitions

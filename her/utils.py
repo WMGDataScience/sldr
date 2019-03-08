@@ -150,6 +150,18 @@ def get_params(args=[], verbose=False):
     parser.add_argument('--obj_action_type', default='slide_only', type=str,
                          choices=['all', 'slide_only', 'rotation_only'],
                          help='the type objects actions')
+
+    parser.add_argument('--n_cycles', default=50, type=int,\
+                         help='number of cycles per iteration')
+
+    parser.add_argument('--n_rollouts', default=38, type=int,\
+                         help='number of rollouts per cycle')
+
+    parser.add_argument('--n_batches', default=40, type=int,\
+                         help='number of batch updates per cycle')
+    
+    parser.add_argument('--n_test_rollouts', default=10, type=int,\
+                         help='number of test rollouts per cycle')
     
 
 

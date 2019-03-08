@@ -556,7 +556,7 @@ class MADDPG_RAE(object):
         self.entities.extend(self.critics_optim)
 
         # backward dynamics model
-        self.backward = BackwardDyn(observation_space, action_space[1]).to(device)
+        self.backward = BackwardDyn(3, action_space[1]).to(device)
         self.backward_optim = optimizer(self.backward.parameters(), lr = critic_lr)
 
         self.entities.append(self.backward)
@@ -611,6 +611,10 @@ class MADDPG_RAE(object):
         s2__ = K.cat([K.tensor(batch['o_3'], dtype=self.dtype, device=self.device)[:, observation_space:],
                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
 
+        ag = K.tensor(batch['ag'], dtype=self.dtype, device=self.device)
+        ag_2 = K.tensor(batch['ag_2'], dtype=self.dtype, device=self.device)  
+        ag_3 = K.tensor(batch['ag_3'], dtype=self.dtype, device=self.device)             
+
 
         if normalizer[0] is not None:
             s1 = normalizer[0].preprocess(s1)
@@ -623,7 +627,8 @@ class MADDPG_RAE(object):
 
         a1_ = self.actors_target[0](s1_)
         a2_ = self.actors_target[1](s2_)
-        a2_[mask] = self.estimate_obj_action(s2_[mask], s2__[mask])           
+        #a2_[mask] = self.estimate_obj_action(s2_[mask], s2__[mask])   
+        a2_[mask] = self.estimate_obj_action(ag_2[mask], ag_3[mask])         
 
         s = [s1, s2]
         s_ = [s1_, s2_]
@@ -643,7 +648,8 @@ class MADDPG_RAE(object):
         # Actors 
         a1 = self.actors[0](s1)
         a2 = self.actors[1](s2)
-        a2_[mask] = self.estimate_obj_action(s2[mask], s2_[mask])
+        #a2_[mask] = self.estimate_obj_action(s2[mask], s2_[mask])
+        a2[mask] = self.estimate_obj_action(ag[mask], ag_2[mask])
 
         loss_actor = -self.critics[i_agent](s[i_agent], K.cat([a1, a2],dim=1)).mean()
         
@@ -679,19 +685,24 @@ class MADDPG_RAE(object):
 
         mask = K.tensor(tuple(map(lambda ai_object: ai_object>0, K.tensor(batch['o'][:,-1]))), dtype=K.uint8, device=self.device)
 
-        s2 = K.cat([K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, observation_space:],
-                    K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+        #s2 = K.cat([K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, observation_space:],
+        #            K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
 
         a2 = K.tensor(batch['u'], dtype=self.dtype, device=self.device)[:, action_space:]
 
-        s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
-                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+        #s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
+        #             K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
 
-        if normalizer[1] is not None:
-            s2 = normalizer[1].preprocess(s2)
-            s2_ = normalizer[1].preprocess(s2_)
+        #if normalizer[1] is not None:
+        #    s2 = normalizer[1].preprocess(s2)
+        #    s2_ = normalizer[1].preprocess(s2_)
 
-        a2_pred = self.backward(s2[mask], s2_[mask])
+        #a2_pred = self.backward(s2[mask], s2_[mask])
+
+        ag = K.tensor(batch['ag'], dtype=self.dtype, device=self.device)
+        ag_2 = K.tensor(batch['ag_2'], dtype=self.dtype, device=self.device)
+
+        a2_pred = self.backward(ag[mask], ag_2[mask])
 
         loss_backward = self.loss_func(a2_pred, a2[mask])
 
