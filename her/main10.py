@@ -34,7 +34,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     SEED = config['random_seed']
 
     if (ENV_NAME == 'FetchStackMulti-v1') or (ENV_NAME == 'FetchPushMulti-v1'):
-        env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], obj_action_type=config['obj_action_type'])
+        env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], obj_action_type=config['obj_action_type'], observe_obj_grp=config['observe_obj_grp'])
     else:
         env = gym.make(ENV_NAME)
 

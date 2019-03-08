@@ -151,6 +151,10 @@ def get_params(args=[], verbose=False):
                          choices=['all', 'slide_only', 'rotation_only'],
                          help='the type objects actions')
 
+    parser.add_argument("--observe_obj_grp", default="False",
+                        choices=['True', 'False'],
+                        help="wheather or not robot can observe object type") 
+
     parser.add_argument('--n_cycles', default=50, type=int,\
                          help='number of cycles per iteration')
 
@@ -223,17 +227,23 @@ def get_params(args=[], verbose=False):
     else:
         args['discrete_action'] = False
     
-    # discrete actions
+    # actor l2 regularization
     if args['regularization'] == 'True':
         args['regularization'] = True
     else:
         args['regularization'] = False
 
-    # discrete actions
+    # reward normalization
     if args['reward_normalization'] == 'True':
         args['reward_normalization'] = True
     else:
         args['reward_normalization'] = False
+
+    # object type observablity
+    if args['observe_obj_grp'] == 'True':
+        args['observe_obj_grp'] = True
+    else:
+        args['observe_obj_grp'] = False
 
     if verbose:
         print("\n==> Arguments:")
