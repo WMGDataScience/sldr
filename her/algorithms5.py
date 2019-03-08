@@ -140,6 +140,8 @@ class DDPG_BD(object):
                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
         s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+        s2__ = K.cat([K.tensor(batch['o_3'], dtype=self.dtype, device=self.device)[:, observation_space:],
+                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
         
         if normalizer[0] is not None:
             s1 = normalizer[0].preprocess(s1)
@@ -148,12 +150,13 @@ class DDPG_BD(object):
         if normalizer[1] is not None:
             s2 = normalizer[1].preprocess(s2)
             s2_ = normalizer[1].preprocess(s2_)
+            s2__ = normalizer[1].preprocess(s2__)
 
         s, s_, a = (s1, s1_, a1) if self.agent_id == 0 else (s2, s2_, a2)
         a_ = self.actors_target[0](s_)
              
         if use_object_Qfunc:
-            r = self.get_obj_reward(s2, s2_)
+            r = self.get_obj_reward(s2, s2_, s2__)
         else:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
 
@@ -161,7 +164,8 @@ class DDPG_BD(object):
         V = self.critics_target[0](s_, a_).detach()
 
         target_Q = (V * self.gamma) + r
-        target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
+        if not use_object_Qfunc:
+            target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
 
         loss_critic = self.loss_func(Q, target_Q)
 
@@ -193,10 +197,12 @@ class DDPG_BD(object):
 
         return action
 
-    def get_obj_reward(self, state, next_state):
+    def get_obj_reward(self, state, next_state, next_next_state):
         with K.no_grad():
             action = self.backward(state.to(self.device), next_state.to(self.device))
-            reward = self.object_Qfunc(state.to(self.device), action)
+            next_action = self.backward(next_state.to(self.device), next_next_state.to(self.device))
+
+            reward = self.object_Qfunc(state.to(self.device), action) - self.gamma*self.object_Qfunc(next_state.to(self.device), next_action)
         
         return reward
 
