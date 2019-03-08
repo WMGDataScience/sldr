@@ -384,15 +384,16 @@ class MADDPG_BD(object):
             a_ = self.actors_target[0](s_)
 
         if use_object_Qfunc:
-            r = self.get_obj_reward(s2, s2_)
+            r = self.get_obj_reward(s2, s2_, s2__)
         else:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
 
         Q = self.critics[0](s, a)
         V = self.critics_target[0](s_, a_).detach()
-
+        
         target_Q = (V * self.gamma) + r
-        target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
+        if not use_object_Qfunc:
+            target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
 
         loss_critic = self.loss_func(Q, target_Q)
 
@@ -435,10 +436,12 @@ class MADDPG_BD(object):
 
         return action
 
-    def get_obj_reward(self, state, next_state):
+    def get_obj_reward(self, state, next_state, next_next_state):
         with K.no_grad():
             action = self.backward(state.to(self.device), next_state.to(self.device))
-            reward = self.object_Qfunc(state.to(self.device), action)
+            next_action = self.backward(next_state.to(self.device), next_next_state.to(self.device))
+
+            reward = self.object_Qfunc(state.to(self.device), action) - self.gamma*self.object_Qfunc(next_state.to(self.device), next_action)
         
         return reward
 
