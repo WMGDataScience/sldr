@@ -98,7 +98,7 @@ class DDPG_BD(object):
             self.object_policy.eval()
             self.entities.append(self.object_policy)
 
-        print('volta2-dgx1')
+        print('volta2-dgx1-main7-clamp-both-plusR')
 
     def to_cpu(self):
         for entity in self.entities:
@@ -160,7 +160,7 @@ class DDPG_BD(object):
         if self.object_Qfunc is None:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
         else:
-            r = self.get_obj_reward(s2, s2_) + K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
+            r = self.get_obj_reward_v4(s2, s2_) + K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
             #r = self.get_obj_reward(s2, s2_, s2__)
 
         Q = self.critics[0](s, a)       
@@ -233,6 +233,23 @@ class DDPG_BD(object):
         
         return reward
 
+    def get_obj_reward_v4(self, state, next_state):
+        with K.no_grad():
+            action = self.backward(state.to(self.device), next_state.to(self.device))
+            opt_action = self.object_policy(state.to(self.device))
+
+            reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
+            
+            reward = reward.clamp(min=-1.0, max=0.)
+        return reward
+
+    def get_obj_reward_v5(self, state, next_state):
+        with K.no_grad():
+            action = self.backward(state.to(self.device), next_state.to(self.device))
+            opt_action = self.object_policy(state.to(self.device))
+
+            reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
+        return reward
 
     def update_backward(self, batch, normalizer=None):
 
@@ -346,6 +363,8 @@ class MADDPG_BD(object):
             self.object_policy.eval()
             self.entities.append(self.object_policy)
 
+        print('maddpg-main12algo7-clamp-both-plusR')
+
     def to_cpu(self):
         for entity in self.entities:
             if type(entity) != type(self.actors_optim[0]):
@@ -390,8 +409,8 @@ class MADDPG_BD(object):
                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
         s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
-        s2__ = K.cat([K.tensor(batch['o_3'], dtype=self.dtype, device=self.device)[:, observation_space:],
-                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+        # s2__ = K.cat([K.tensor(batch['o_3'], dtype=self.dtype, device=self.device)[:, observation_space:],
+        #              K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
         
         if normalizer[0] is not None:
             s1 = normalizer[0].preprocess(s1)
@@ -400,13 +419,13 @@ class MADDPG_BD(object):
         if normalizer[1] is not None:
             s2 = normalizer[1].preprocess(s2)
             s2_ = normalizer[1].preprocess(s2_)
-            s2__ = normalizer[1].preprocess(s2__)
+            # s2__ = normalizer[1].preprocess(s2__)
 
         s, s_, a = (s1, s1_, K.cat([a1, a2],dim=1)) if self.agent_id == 0 else (s2, s2_, a2)
         
         if self.agent_id == 0:
             a_ = self.get_obj_action(s2_)
-            a_[mask] = self.estimate_obj_action(s2_[mask], s2__[mask])
+            #a_[mask] = self.estimate_obj_action(s2_[mask], s2__[mask])
             a_ = K.cat([self.actors_target[0](s_), a_],dim=1)
         else:
             a_ = self.actors_target[0](s_)
@@ -414,7 +433,8 @@ class MADDPG_BD(object):
         if self.object_Qfunc is None:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
         else:
-            r = self.get_obj_reward(s2, s2_, s2__)
+            r = self.get_obj_reward_v4(s2, s2_) + K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
+            #r = self.get_obj_reward(s2, s2_, s2__)
 
         Q = self.critics[0](s, a)
         V = self.critics_target[0](s_, a_).detach()
@@ -422,6 +442,8 @@ class MADDPG_BD(object):
         target_Q = (V * self.gamma) + r
         if self.object_Qfunc is None:
             target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
+        else:
+            target_Q = target_Q.clamp(-2./(1.-self.gamma), 0.)
 
         loss_critic = self.loss_func(Q, target_Q)
 
@@ -431,7 +453,7 @@ class MADDPG_BD(object):
 
         if self.agent_id == 0:
             a = self.get_obj_action(s2)
-            a[mask] = self.estimate_obj_action(s2[mask], s2_[mask])
+            #a[mask] = self.estimate_obj_action(s2[mask], s2_[mask])
             a = K.cat([self.actors[0](s), a],dim=1)
         else:
             a = self.actors[0](s)
@@ -464,15 +486,47 @@ class MADDPG_BD(object):
 
         return action
 
-    def get_obj_reward(self, state, next_state, next_next_state):
+    def get_obj_reward(self, state, next_state):
+        with K.no_grad():
+            action = self.backward(state.to(self.device), next_state.to(self.device))
+
+            reward = self.object_Qfunc(state.to(self.device), action)/10.
+
+        return reward
+
+    def get_obj_reward_v2(self, state, next_state, next_next_state):
         with K.no_grad():
             action = self.backward(state.to(self.device), next_state.to(self.device))
             next_action = self.backward(next_state.to(self.device), next_next_state.to(self.device))
 
-            #reward = self.object_Qfunc(state.to(self.device), action) - self.gamma*self.object_Qfunc(next_state.to(self.device), next_action)
             reward = self.object_Qfunc(next_state.to(self.device), next_action) - self.object_Qfunc(state.to(self.device), action)
-            #reward = self.object_Qfunc(state.to(self.device), action)
         
+        return reward
+
+    def get_obj_reward_v3(self, state, next_state):
+        with K.no_grad():
+            action = self.backward(state.to(self.device), next_state.to(self.device))
+
+            reward = self.object_Qfunc(next_state.to(self.device), action) - self.object_Qfunc(state.to(self.device), action)
+        
+        return reward
+
+    def get_obj_reward_v4(self, state, next_state):
+        with K.no_grad():
+            action = self.backward(state.to(self.device), next_state.to(self.device))
+            opt_action = self.object_policy(state.to(self.device))
+
+            reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
+            
+            reward = reward.clamp(min=-1.0, max=0.)
+        return reward
+
+    def get_obj_reward_v5(self, state, next_state):
+        with K.no_grad():
+            action = self.backward(state.to(self.device), next_state.to(self.device))
+            opt_action = self.object_policy(state.to(self.device))
+
+            reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
         return reward
 
     def update_backward(self, batch, normalizer=None):

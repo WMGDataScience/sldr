@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms5 import DDPG_BD, MADDPG_BD
+from her.algorithms6 import DDPG_BD, MADDPG_BD
 from her.experience import Normalizer
 #from her.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
 from her.replay_buffer import ReplayBuffer
@@ -161,10 +161,10 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
                 next_obs_goal[i_agent] = normalizer[i_agent].preprocess(next_obs_goal[i_agent])
 
         # for monitoring
-        #if agent_id == 0:
-        #    episode_reward += model.get_obj_reward(obs_goal[1], next_obs_goal[1])
-        #else:
-        episode_reward += reward
+        if agent_id == 0:
+            episode_reward += model.get_obj_reward_v3(obs_goal[1], next_obs_goal[1])
+        else:
+            episode_reward += reward
 
         for i_agent in range(2):
             state = {

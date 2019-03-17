@@ -98,7 +98,7 @@ class DDPG_BD(object):
             self.object_policy.eval()
             self.entities.append(self.object_policy)
 
-        print('volta2-dgx1')
+        print('volta2-dgx1-main8-div20')
 
     def to_cpu(self):
         for entity in self.entities:
@@ -160,7 +160,7 @@ class DDPG_BD(object):
         if self.object_Qfunc is None:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
         else:
-            r = self.get_obj_reward(s2, s2_) + K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
+            r = self.get_obj_reward(s2, s2_)
             #r = self.get_obj_reward(s2, s2_, s2__)
 
         Q = self.critics[0](s, a)       
@@ -170,7 +170,7 @@ class DDPG_BD(object):
         if self.object_Qfunc is None:
             target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
         else:
-            target_Q = target_Q.clamp(-2./(1.-self.gamma), 0.)
+            target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
 
         loss_critic = self.loss_func(Q, target_Q)
 
@@ -212,7 +212,7 @@ class DDPG_BD(object):
         with K.no_grad():
             action = self.backward(state.to(self.device), next_state.to(self.device))
 
-            reward = self.object_Qfunc(state.to(self.device), action)/10.
+            reward = self.object_Qfunc(state.to(self.device), action)/20.
 
         return reward
 
@@ -231,6 +231,16 @@ class DDPG_BD(object):
 
             reward = self.object_Qfunc(next_state.to(self.device), action) - self.object_Qfunc(state.to(self.device), action)
         
+        return reward
+
+    def get_obj_reward_v4(self, state, next_state):
+        with K.no_grad():
+            action = self.backward(state.to(self.device), next_state.to(self.device))
+            opt_action = self.object_policy(state.to(self.device))
+
+            reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
+            
+            reward = reward.clamp(max=0.)
         return reward
 
 

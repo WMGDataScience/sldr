@@ -12,8 +12,10 @@ import gym_wmgds as gym
 
 from her.algorithms5 import DDPG_BD
 from her.experience import Normalizer
-from her.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
-from her.her_sampler import make_sample_her_transitions_v2 as make_sample_her_transitions
+#from her.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
+from her.replay_buffer import ReplayBuffer
+#from her.her_sampler import make_sample_her_transitions_v2 as make_sample_her_transitions
+from her.her_sampler import make_sample_her_transitions
 from her.exploration import Noise
 from her.utils import Saver, Summarizer, get_params, running_mean
 from her.agents.basic import Actor 
@@ -85,7 +87,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                   Actor, Critic, loss_func, GAMMA, TAU, out_func=OUT_FUNC, discrete=False, 
                   regularization=REGULARIZATION, normalized_rewards=NORMALIZED_REWARDS,
                   agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, object_policy=object_policy)
-    normalizer = (Normalizer(), Normalizer())
+    normalizer = [Normalizer(), Normalizer()]
 
     #memory initilization  
     if her:
@@ -237,7 +239,7 @@ def run(model, experiment_args, train=True):
                     model.to_cuda()
 
                     batch = memory.sample(BATCH_SIZE)
-                    critic_loss, actor_loss = model.update_parameters(batch, normalizer, use_object_Qfunc=True if agent_id==0 else False)
+                    critic_loss, actor_loss = model.update_parameters(batch, normalizer)
 
                     if i_batch == N_BATCHES - 1:
                         critic_losses.append(critic_loss)

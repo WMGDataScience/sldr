@@ -98,7 +98,7 @@ class DDPG_BD(object):
             self.object_policy.eval()
             self.entities.append(self.object_policy)
 
-        print('volta2-dgx1')
+        print('volta2-dgx1-main6')
 
     def to_cpu(self):
         for entity in self.entities:
@@ -160,7 +160,7 @@ class DDPG_BD(object):
         if self.object_Qfunc is None:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
         else:
-            r = self.get_obj_reward(s2, s2_) + K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
+            r = self.get_obj_reward_v3(s2, s2_)
             #r = self.get_obj_reward(s2, s2_, s2__)
 
         Q = self.critics[0](s, a)       
@@ -169,8 +169,6 @@ class DDPG_BD(object):
         target_Q = (V * self.gamma) + r
         if self.object_Qfunc is None:
             target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
-        else:
-            target_Q = target_Q.clamp(-2./(1.-self.gamma), 0.)
 
         loss_critic = self.loss_func(Q, target_Q)
 

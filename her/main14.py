@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms5 import DDPG_BD, MADDPG_BD
+from her.algorithms7 import DDPG_BD, MADDPG_BD
 from her.experience import Normalizer
 #from her.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
 from her.replay_buffer import ReplayBuffer
@@ -81,7 +81,8 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
         noise = Noise(action_space[0].shape[0], sigma=0.2, eps=0.3)
     elif agent == 'object':
         agent_id = 1
-        noise = Noise(action_space[1].shape[0], sigma=0.05, eps=0.1)
+        #noise = Noise(action_space[1].shape[0], sigma=0.05, eps=0.1)
+        noise = Noise(action_space[1].shape[0], sigma=0.2, eps=0.3)
 
     #model initialization
     optimizer = (optim.Adam, (ACTOR_LR, CRITIC_LR)) # optimiser func, (actor_lr, critic_lr)
@@ -107,6 +108,8 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     memory = ReplayBuffer(buffer_shapes, MEM_SIZE, env._max_episode_steps, sample_her_transitions)
 
     experiment_args = (env, memory, noise, config, normalizer, agent_id)
+
+    print('train BD x10')
           
     return model, experiment_args
 
@@ -135,7 +138,10 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
         for i_agent in range(2):
             obs_goal.append(K.cat([obs[i_agent], goal], dim=-1))
             if normalizer[i_agent] is not None:
-                obs_goal[i_agent] = normalizer[i_agent].preprocess_with_update(obs_goal[i_agent])
+                if i_agent == 0:
+                    obs_goal[i_agent] = normalizer[i_agent].preprocess_with_update(obs_goal[i_agent])
+                else:
+                    obs_goal[i_agent] = normalizer[i_agent].preprocess(obs_goal[i_agent])
 
         action = model.select_action(obs_goal[agent_id], noise).cpu().numpy().squeeze(0)
 
@@ -161,10 +167,10 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
                 next_obs_goal[i_agent] = normalizer[i_agent].preprocess(next_obs_goal[i_agent])
 
         # for monitoring
-        #if agent_id == 0:
-        #    episode_reward += model.get_obj_reward(obs_goal[1], next_obs_goal[1])
-        #else:
-        episode_reward += reward
+        if agent_id == 0:
+            episode_reward += model.get_obj_reward_v4(obs_goal[1], next_obs_goal[1])
+        else:
+            episode_reward += reward
 
         for i_agent in range(2):
             state = {
@@ -292,7 +298,8 @@ def run(model, experiment_args, train=True):
 
     if train and agent_id==1:
         print('Training Backward Model')
-        for _ in range(N_EPISODES*N_CYCLES):
+        model.to_cuda()
+        for _ in range(N_EPISODES*N_CYCLES*10):
             for i_batch in range(N_BATCHES):
                 batch = memory.sample(BATCH_SIZE)
                 backward_loss = model.update_backward(batch, normalizer)  
