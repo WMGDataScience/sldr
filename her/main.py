@@ -10,8 +10,8 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms.ddpg_bd import DDPG_BD
-from her.algorithms.maddpg_bd import MADDPG_BD
+from her.algorithms.ddpg import DDPG_BD
+from her.algorithms.maddpg import MADDPG_BD
 from her.experience import Normalizer
 #from her.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
 from her.replay_buffer import ReplayBuffer
