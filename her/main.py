@@ -13,10 +13,6 @@ import gym_wmgds as gym
 from her.algorithms.ddpg import DDPG_BD
 from her.algorithms.maddpg import MADDPG_BD
 from her.experience import Normalizer
-#from her.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
-from her.replay_buffer import ReplayBuffer
-#from her.her_sampler import make_sample_her_transitions_v2 as make_sample_her_transitions
-from her.her_sampler import make_sample_her_transitions
 from her.exploration import Noise
 from her.utils import Saver, Summarizer, get_params, running_mean
 from her.agents.basic import Actor 
@@ -73,8 +69,12 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     OUT_FUNC = K.tanh 
     if config['agent_alg'] == 'DDPG_BD':
         MODEL = DDPG_BD
+        from her.replay_buffer import ReplayBuffer
+        from her.her_sampler import make_sample_her_transitions
     elif config['agent_alg'] == 'MADDPG_BD':
         MODEL = MADDPG_BD
+        from her.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
+        from her.her_sampler import make_sample_her_transitions_v2 as make_sample_her_transitions
 
     #exploration initialization
     if agent == 'robot':

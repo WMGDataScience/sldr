@@ -152,8 +152,8 @@ class MADDPG_BD(object):
                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
         s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
-        # s2__ = K.cat([K.tensor(batch['o_3'], dtype=self.dtype, device=self.device)[:, observation_space:],
-        #              K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+        s2__ = K.cat([K.tensor(batch['o_3'], dtype=self.dtype, device=self.device)[:, observation_space:],
+                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
         
         if normalizer[0] is not None:
             s1 = normalizer[0].preprocess(s1)
@@ -162,14 +162,16 @@ class MADDPG_BD(object):
         if normalizer[1] is not None:
             s2 = normalizer[1].preprocess(s2)
             s2_ = normalizer[1].preprocess(s2_)
-            # s2__ = normalizer[1].preprocess(s2__)
+            s2__ = normalizer[1].preprocess(s2__)
+
+        a2[mask] = self.estimate_obj_action(s2[mask], s2_[mask])
 
         s, s_, a = (s1, s1_, K.cat([a1, a2],dim=1)) if self.agent_id == 0 else (s2, s2_, a2)
         
         if self.agent_id == 0:
-            a_ = self.get_obj_action(s2_)
-            #a_[mask] = self.estimate_obj_action(s2_[mask], s2__[mask])
-            a_ = K.cat([self.actors_target[0](s_), a_],dim=1)
+            a2_ = self.get_obj_action(s2_)
+            a2_[mask] = self.estimate_obj_action(s2_[mask], s2__[mask])
+            a_ = K.cat([self.actors_target[0](s_), a2_],dim=1)
         else:
             a_ = self.actors_target[0](s_)
 
@@ -194,9 +196,9 @@ class MADDPG_BD(object):
         self.critics_optim[0].step()
 
         if self.agent_id == 0:
-            a = self.get_obj_action(s2)
-            #a[mask] = self.estimate_obj_action(s2[mask], s2_[mask])
-            a = K.cat([self.actors[0](s), a],dim=1)
+            a2 = self.get_obj_action(s2)
+            a2[mask] = self.estimate_obj_action(s2[mask], s2_[mask])
+            a = K.cat([self.actors[0](s), a2],dim=1)
         else:
             a = self.actors[0](s)
 
