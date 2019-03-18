@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
 dtype = K.float32
 
-def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None, object_policy=None):
+def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None, object_policy=None, reward_fun=None):
         
     #hyperparameters
     ENV_NAME = config['env_id'] 
@@ -41,7 +41,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     else:
         env = gym.make(ENV_NAME)
 
-    def reward_fun(ag_2, g, info):  # vectorized
+    def her_reward_fun(ag_2, g, info):  # vectorized
         return env.compute_reward(achieved_goal=ag_2, desired_goal=g, info=info)
     
     env.seed(SEED)
@@ -91,14 +91,15 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     model = MODEL(observation_space, action_space, optimizer, 
                   Actor, Critic, loss_func, GAMMA, TAU, out_func=OUT_FUNC, discrete=False, 
                   regularization=REGULARIZATION, normalized_rewards=NORMALIZED_REWARDS,
-                  agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, object_policy=object_policy)
+                  agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
+                  object_policy=object_policy, reward_fun=reward_fun)
     normalizer = [Normalizer(), Normalizer()]
 
     #memory initilization  
     if her:
-        sample_her_transitions = make_sample_her_transitions('future', 4, reward_fun)
+        sample_her_transitions = make_sample_her_transitions('future', 4, her_reward_fun)
     else:
-        sample_her_transitions = make_sample_her_transitions('none', 4, reward_fun)
+        sample_her_transitions = make_sample_her_transitions('none', 4, her_reward_fun)
 
     buffer_shapes = {
         'o' : (env._max_episode_steps, env.observation_space.spaces['observation'].shape[1]*2),
@@ -166,7 +167,7 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
 
         # for monitoring
         if agent_id == 0:
-            episode_reward += (model.get_obj_reward_v4(obs_goal[1], next_obs_goal[1]) + reward)
+            episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) + reward)
         else:
             episode_reward += reward
 
