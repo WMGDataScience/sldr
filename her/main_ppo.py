@@ -137,7 +137,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
 
     experiment_args = (env, memory, noise, config, normalizer, agent_id)
 
-    print('train BD x10')
+    print('clipped between -1 and 0, and masked with abs(r), and + r')
           
     return model, experiment_args
 
@@ -292,7 +292,6 @@ def run(model, experiment_args, train=True):
                 memory.to(model.device)
 
                 critic_loss, actor_loss, dist_entropy = model.update(memory)
-                print(dist_entropy)
 
                 critic_losses.append(critic_loss)
                 actor_losses.append(actor_loss)
