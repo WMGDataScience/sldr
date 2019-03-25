@@ -246,7 +246,8 @@ def run(model, experiment_args, train=True):
                 for i_rollout in range(N_ROLLOUTS):
                     # Initialize the environment and state
                     ai_object = 1 if np.random.rand() < config['ai_object_rate']  else 0
-                    trajectories, _, _, _ = rollout(env, model, noise, normalizer, render=(i_rollout==N_ROLLOUTS-1), agent_id=agent_id, ai_object=ai_object)
+                    render = config['render'] > 0 and i_rollout==N_ROLLOUTS-1
+                    trajectories, _, _, _ = rollout(env, model, noise, normalizer, render=render, agent_id=agent_id, ai_object=ai_object)
                     memory.store_episode(trajectories.copy())   
               
                 for i_batch in range(N_BATCHES):  
