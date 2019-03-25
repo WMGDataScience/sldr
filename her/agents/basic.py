@@ -6,10 +6,13 @@ import pdb
 
 
 class Critic(nn.Module):
-    def __init__(self, observation_space, action_space):
+    def __init__(self, observation_space, action_space=None):
         super(Critic, self).__init__()
         
-        input_size = observation_space + action_space.shape[0]
+        if action_space is None:
+            input_size = observation_space
+        else:
+            input_size = observation_space + action_space.shape[0]
         hidden_size = 256
         output_size = 1
         
@@ -24,9 +27,9 @@ class Critic(nn.Module):
                                 nn.Linear(hidden_size, output_size))
         
 
-    def forward(self, s, a):
+    def forward(self, s, a=None):
 
-        x = K.cat([s, a], dim=1)     
+        x = s if (a is None) else K.cat([s, a], dim=1)
         x = self.FC(x)
         return x
 
@@ -184,6 +187,62 @@ class Actor(nn.Module):
         x = self.FC(x)
    
         return x
+
+# Normal
+FixedNormal = K.distributions.Normal
+log_prob_normal = FixedNormal.log_prob
+FixedNormal.log_probs = lambda self, actions: log_prob_normal(self, actions).sum(-1, keepdim=True)
+
+normal_entropy = FixedNormal.entropy
+FixedNormal.entropies = lambda self: normal_entropy(self).sum(-1)
+FixedNormal.mode = lambda self: self.mean
+
+class ActorStoch(nn.Module):
+
+    def __init__(self, observation_space, action_space, discrete=True, out_func=K.sigmoid):
+        super(ActorStoch, self).__init__()
+        
+        input_size = observation_space
+        hidden_size = 256
+        output_size = action_space.shape[0]
+
+        self.discrete = discrete
+        self.out_func = out_func
+        self.action_space = action_space
+
+        BN = nn.BatchNorm1d(input_size)
+        BN.weight.data.fill_(1)
+        BN.bias.data.fill_(0)
+        
+        self.FC = nn.Sequential(#BN,
+                                nn.Linear(input_size, hidden_size), nn.ReLU(True),
+                                nn.Linear(hidden_size, hidden_size), nn.ReLU(True),
+                                nn.Linear(hidden_size, hidden_size), nn.ReLU(True),
+                                nn.Linear(hidden_size, output_size))
+
+        bias = K.zeros(output_size)
+        self._bias = nn.Parameter(bias.unsqueeze(1))
+        
+    def forward(self, s):
+
+        x = s
+        if self.discrete:
+            x = F.softmax(self.FC(x), dim=1)
+        else:
+            if self.out_func == 'linear':
+                x = self.FC(x)
+            else:
+                x = self.out_func(self.FC(x))
+                if self.out_func == K.sigmoid:
+                    x = K.tensor(self.action_space.low[0], dtype=x.dtype, device=x.device) + x*K.tensor((self.action_space.high[0]-self.action_space.low[0]), dtype=x.dtype, device=x.device)
+                elif self.out_func == K.tanh:
+                    x = x*K.tensor((self.action_space.high[0]), dtype=x.dtype, device=x.device)
+
+        #x = x*K.tensor((self.action_space.high[0]), dtype=x.dtype, device=x.device)
+
+        action_logstd = self._bias.t().view(1, -1)
+
+        return FixedNormal(x, action_logstd.exp())
 
 
 class ForwardDynReg(nn.Module):

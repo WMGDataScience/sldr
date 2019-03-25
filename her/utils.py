@@ -96,7 +96,7 @@ def get_params(args=[], verbose=False):
     parser.add_argument("--agent_alg",
                         default="DDPG", type=str,
                         choices=['DDPG', 'MADDPG', 'MADDPG_R', 'MADDPG_RAE',
-                                 'DDPG_BD', 'MADDPG_BD', 'DDPG_BD_v2'])
+                                 'DDPG_BD', 'MADDPG_BD', 'PPO_BD', 'DDPG_BD_v2'])
     parser.add_argument("--device", default='cuda',
                         choices=['cpu','cuda'], 
                         help="device type")
@@ -148,9 +148,12 @@ def get_params(args=[], verbose=False):
     parser.add_argument('--ai_object_rate', default=0.10, type=float,\
                          help='the probability of intelligent object')
 
-    parser.add_argument('--obj_action_type', default='slide_only', type=str,
-                         choices=['all', 'slide_only', 'rotation_only'],
-                         help='the type objects actions')
+    #parser.add_argument('--obj_action_type', default='slide_only', type=str,
+    #                     choices=['all', 'slide_only', 'rotation_only'],
+    #                     help='the type objects actions')
+
+    parser.add_argument('--obj_action_type', default=[0,1,2], type=list,
+                         help='the indices of objects actions')
 
     parser.add_argument("--observe_obj_grp", default="False",
                         choices=['True', 'False'],
@@ -167,7 +170,31 @@ def get_params(args=[], verbose=False):
     
     parser.add_argument('--n_test_rollouts', default=10, type=int,\
                          help='number of test rollouts per cycle')
-    
+
+    parser.add_argument('--use_gae', default="True",
+                        choices=['True', 'False'],
+                        help="wheather or not robot can observe object type") 
+
+    parser.add_argument("--gae_lambda", default=0.95, type=float,
+                        help="PPO lambda factor")
+
+    parser.add_argument('--ppo_epoch', default=10, type=int,\
+                         help='PPO epoch')
+
+    parser.add_argument("--entropy_coef", default=0, type=float,
+                        help="PPO entropy_coef")
+
+    parser.add_argument("--value_loss_coef", default=0.5, type=float,
+                        help="PPO value loss coef")
+
+    parser.add_argument('--clip_param', default=0.2, type=float,
+                        help='ppo clip parameter (default: 0.2)')
+
+    parser.add_argument('--eps', type=float, default=1e-5,
+        help='RMSprop optimizer epsilon (default: 1e-5)')
+
+    parser.add_argument('--max_grad_norm',type=float,default=0.5,
+        help='max norm of gradients (default: 0.5)')
 
 
     # acquire in a dict
@@ -246,6 +273,17 @@ def get_params(args=[], verbose=False):
     else:
         args['observe_obj_grp'] = False
 
+    # object type observablity
+    if args['use_gae'] == 'True':
+        args['use_gae'] = True
+    else:
+        args['use_gae'] = False
+
+    obj_action_type = []
+    for i in args['obj_action_type']:
+        obj_action_type.append(int(i))
+    args['obj_action_type'] = obj_action_type
+        
     if verbose:
         print("\n==> Arguments:")
         for k,v in sorted(args.items()):

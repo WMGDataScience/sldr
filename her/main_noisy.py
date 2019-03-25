@@ -32,7 +32,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     ENV_NAME = config['env_id'] 
     SEED = config['random_seed']
 
-    if (ENV_NAME == 'FetchStackMulti-v1') or (ENV_NAME == 'FetchPushMulti-v1') or (ENV_NAME == 'FetchPickAndPlaceMulti-v1') or (ENV_NAME == 'FetchSlideMulti-v1'):
+    if (ENV_NAME == 'FetchStackMulti-v1') or (ENV_NAME == 'FetchPushMulti-v1') or (ENV_NAME == 'FetchPickAndPlaceMulti-v1'):
         env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], obj_action_type=config['obj_action_type'], observe_obj_grp=config['observe_obj_grp'])
     else:
         env = gym.make(ENV_NAME)
@@ -44,13 +44,12 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     K.manual_seed(SEED)
     np.random.seed(SEED)
 
-    #if config['obj_action_type'] == 'all':
-    #    n_actions = config['max_nb_objects'] * 7 + 4
-    #elif config['obj_action_type'] == 'slide_only':
-    #    n_actions = config['max_nb_objects'] * 3 + 4
-    #elif config['obj_action_type'] == 'rotation_only':
-    #    n_actions = config['max_nb_objects'] * 4 + 4
-    n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + 4
+    if config['obj_action_type'] == 'all':
+        n_actions = config['max_nb_objects'] * 7 + 4
+    elif config['obj_action_type'] == 'slide_only':
+        n_actions = config['max_nb_objects'] * 3 + 4
+    elif config['obj_action_type'] == 'rotation_only':
+        n_actions = config['max_nb_objects'] * 4 + 4
 
     observation_space = env.observation_space.spaces['observation'].shape[1] + env.observation_space.spaces['desired_goal'].shape[0]
     action_space = (gym.spaces.Box(-1., 1., shape=(4,), dtype='float32'),
@@ -81,7 +80,6 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     if agent == 'robot':
         agent_id = 0
         noise = Noise(action_space[0].shape[0], sigma=0.2, eps=0.3)
-        env._max_episode_steps *= config['max_nb_objects']
     elif agent == 'object':
         agent_id = 1
         #noise = Noise(action_space[1].shape[0], sigma=0.05, eps=0.1)
@@ -113,7 +111,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
 
     experiment_args = (env, memory, noise, config, normalizer, agent_id)
 
-    print('clipped between -1 and 0, and masked with abs(r), and + r')
+    print('train BD x10')
           
     return model, experiment_args
 
@@ -150,7 +148,12 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
             action_to_env = np.zeros_like(env.action_space.sample())
             action_to_env[0:action.shape[0]] = action
             if ai_object:
-                action_to_env[action.shape[0]::] = model.get_obj_action(obs_goal[1]).cpu().numpy().squeeze(0)
+                obj_noise = Noise(3, sigma=0.2, eps=0.3)
+                
+                obj_action = model.get_obj_action(obs_goal[1]).cpu().numpy().squeeze(0)
+                obj_action = obj_noise.get_noisy_action(obj_action).clip(-1.0, 1.0)
+                action_to_env[action.shape[0]::] = obj_action
+
         else:
             action_to_env = env.action_space.sample()
             action_to_env[-action.shape[0]::] = action
@@ -169,8 +172,7 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
 
         # for monitoring
         if agent_id == 0:
-            episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) * K.abs(reward) + reward)
-            #episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) + reward)
+            episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) + reward)
         else:
             episode_reward += reward
 

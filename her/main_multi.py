@@ -50,11 +50,13 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     #    n_actions = config['max_nb_objects'] * 3 + 4
     #elif config['obj_action_type'] == 'rotation_only':
     #    n_actions = config['max_nb_objects'] * 4 + 4
-    n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + 4
+    #n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + 4
+    n_actions = 1 * len(config['obj_action_type']) + 4 + 1
 
     observation_space = env.observation_space.spaces['observation'].shape[1] + env.observation_space.spaces['desired_goal'].shape[0]
     action_space = (gym.spaces.Box(-1., 1., shape=(4,), dtype='float32'),
                     gym.spaces.Box(-1., 1., shape=(n_actions-4,), dtype='float32'),
+                    #gym.spaces.Box(-1., 1., shape=(len(config['obj_action_type'])+1,), dtype='float32'),
                     gym.spaces.Box(-1., 1., shape=(n_actions,), dtype='float32'))
 
     GAMMA = config['gamma'] 
@@ -113,9 +115,24 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
 
     experiment_args = (env, memory, noise, config, normalizer, agent_id)
 
-    print('clipped between -1 and 0, and masked with abs(r), and + r')
+    print('train BD x10')
           
     return model, experiment_args
+
+def expand_actions(action, n_objects):
+
+        mask = (action[:,-1] + 1) / 2 
+        mask = (mask * n_objects) // 1
+        mask[mask==n_objects] = n_objects - 1
+        mask = mask.to(K.uint8)
+        
+        action = action[:,:-1]
+
+        action_expanded = K.zeros((action.shape[0], n_objects, action.shape[1]))
+        for i in range(action.shape[0]):
+            action_expanded[i, mask[i].item(),] = action[i,]
+        
+        return action_expanded.view(-1, action.shape[1]*n_objects)
 
 def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_object=False):
     trajectories = []
@@ -144,16 +161,30 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
             if normalizer[i_agent] is not None:
                 obs_goal[i_agent] = normalizer[i_agent].preprocess_with_update(obs_goal[i_agent])
 
-        action = model.select_action(obs_goal[agent_id], noise).cpu().numpy().squeeze(0)
 
         if agent_id == 0:
+            action = model.select_action(obs_goal[agent_id], noise).cpu().numpy().squeeze(0)
+
             action_to_env = np.zeros_like(env.action_space.sample())
             action_to_env[0:action.shape[0]] = action
+
+            action_to_exp_shape = action.shape[0] + (env.action_space.shape[0]-action.shape[0]) / env.env.n_objects + 1 
+            action_to_exp = action_to_env[0:action_to_exp_shape].copy()
             if ai_object:
-                action_to_env[action.shape[0]::] = model.get_obj_action(obs_goal[1]).cpu().numpy().squeeze(0)
+                action_to_env[action.shape[0]::] = expand_actions(model.get_obj_action(obs_goal[1]), env.env.n_objects).cpu().numpy().squeeze(0)
+                action_to_exp[action.shape[0]::] = model.get_obj_action(obs_goal[1]).cpu().numpy().squeeze(0)
+            action_to_xp = action_to_env.copy()
         else:
+            action = model.select_action(obs_goal[agent_id], noise)
+            expanded_action = expand_actions(action, env.env.n_objects).cpu().numpy().squeeze(0)
+            action = action.cpu().numpy().squeeze(0)
+
             action_to_env = env.action_space.sample()
-            action_to_env[-action.shape[0]::] = action
+            action_to_env[-expanded_action.shape[0]::] = expanded_action
+
+            action_to_exp_shape = env.action_space.shape[0] - (action.shape[0] - 1) * env.env.n_objects + action.shape[0] 
+            action_to_exp = action_to_env[0:action_to_exp_shape].copy()
+            action_to_exp[-action.shape[0]::] = action
 
         next_state_all, reward, done, info = env.step(action_to_env)
         reward = K.tensor(reward, dtype=dtype).view(1,1)
@@ -169,8 +200,7 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
 
         # for monitoring
         if agent_id == 0:
-            episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) * K.abs(reward) + reward)
-            #episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) + reward)
+            episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) + reward)
         else:
             episode_reward += reward
 
@@ -186,7 +216,7 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
                 'desired_goal'  : next_state_all['desired_goal']    
                 }
             
-            trajectories[i_agent].append((state.copy(), action_to_env, reward, next_state.copy(), done))
+            trajectories[i_agent].append((state.copy(), action_to_exp, reward, next_state.copy(), done))
 
         # Move to the next state
         state_all = next_state_all

@@ -22,7 +22,7 @@ def hard_update(target, source):
 class DDPG_BD(object):
     def __init__(self, observation_space, action_space, optimizer, Actor, Critic, loss_func, gamma, tau, out_func=K.sigmoid,
                  discrete=True, regularization=False, normalized_rewards=False, agent_id=0, object_Qfunc=None, backward_dyn=None, 
-                 object_policy=None, reward_fun=None, dtype=K.float32, device="cuda"):
+                 object_policy=None, reward_fun=None, n_objects=1, dtype=K.float32, device="cuda"):
 
         super(DDPG_BD, self).__init__()
 
@@ -43,6 +43,7 @@ class DDPG_BD(object):
         self.agent_id = agent_id
         self.object_Qfunc = object_Qfunc
         self.object_policy = object_policy
+        self.n_objects = n_objects
 
         # model initialization
         self.entities = []
@@ -103,7 +104,7 @@ class DDPG_BD(object):
         else:
             self.get_obj_reward = self.reward_fun
 
-        print('clipped between -1 and 0, and masked with abs(r), and + r')
+        print('rew-v7.1')
 
     def to_cpu(self):
         for entity in self.entities:
@@ -147,14 +148,23 @@ class DDPG_BD(object):
                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
         s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
-        
+
         if normalizer[0] is not None:
             s1 = normalizer[0].preprocess(s1)
             s1_ = normalizer[0].preprocess(s1_)
 
-        if normalizer[1] is not None:
-            s2 = normalizer[1].preprocess(s2)
-            s2_ = normalizer[1].preprocess(s2_)
+        if self.n_objects > 1:
+            obj_state_space = s2.shape[1] // self.n_objects
+            s2 = s2.view(-1, self.n_objects, obj_action_space)
+            s2_ = s2_.view(-1, self.n_objects, obj_action_space)
+            if normalizer[1] is not None:
+                for i_object in range(self.n_objects):
+                    s2[:,i_object,:] = normalizer[1].preprocess(s2)
+                    s2_ = normalizer[1].preprocess(s2_)
+        else:
+            if normalizer[1] is not None:
+                s2 = normalizer[1].preprocess(s2)
+                s2_ = normalizer[1].preprocess(s2_)
 
         s, s_, a = (s1, s1_, a1) if self.agent_id == 0 else (s2, s2_, a2)
         a_ = self.actors_target[0](s_)
@@ -216,7 +226,7 @@ class DDPG_BD(object):
             opt_action = self.object_policy(state.to(self.device))
 
             reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
-        return reward.clamp(min=-1.0, max=0.0)
+        return reward.clamp(min=-1.0, max=0.)
 
     def update_backward(self, batch, normalizer=None):
 
