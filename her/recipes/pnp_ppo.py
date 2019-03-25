@@ -21,7 +21,7 @@ exp_args=['--env_id', env_name,
           '--random_seed', str(0), 
           '--agent_alg', model_name,
           '--verbose', '2',
-          '--render', '1',
+          '--render', '0',
           '--episode_length', '50',
           '--gamma', '0.98',
           '--n_episodes', '20',
@@ -40,7 +40,7 @@ model, experiment_args = init(config, agent='object', her=True,
                               object_policy=None)
 env, memory, noise, config, normalizer, agent_id = experiment_args
 
-path = '~/Dropbox/Jupyter/notebooks/Reinforcement_Learning/models/obj_model_norm_slide_pnp/'
+path = '~/Dropbox/Jupyter/notebooks/Reinforcement_Learning/models/obj/obj_model_norm_slide_pnp/'
 model.critics[0].load_state_dict(K.load(path + 'object_Qfunc.pt'))
 model.backward.load_state_dict(K.load(path + 'backward_dyn.pt'))
 model.actors[0].load_state_dict(K.load(path + 'object_policy.pt'))
@@ -57,7 +57,7 @@ exp_args2=['--env_id', env_name,
           '--random_seed', str(0), 
           '--agent_alg', model_name,
           '--verbose', '2',
-          '--render', '1',
+          '--render', '0',
           '--episode_length', '50',
           '--gamma', '0.98',
           '--n_episodes', '50',
