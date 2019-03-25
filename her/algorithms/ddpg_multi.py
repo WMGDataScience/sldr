@@ -6,6 +6,7 @@ import torch.optim as optim
 import numpy as np
 
 from her.agents.basic import BackwardDyn
+from her.utils import get_obj_obs
 
 import pdb
 
@@ -104,7 +105,7 @@ class DDPG_BD(object):
         else:
             self.get_obj_reward = self.reward_fun
 
-        print('rew-v7.1')
+        print('clipped between -1 and 0, and masked with abs(r), and + r')
 
     def to_cpu(self):
         for entity in self.entities:
@@ -138,33 +139,41 @@ class DDPG_BD(object):
         
         s1 = K.cat([K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, 0:observation_space],
                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
-        s2 = K.cat([K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, observation_space:],
-                    K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+        
+        if self.n_objects <= 1:
+            s2 = K.cat([K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, observation_space:],
+                        K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+        else:
+            s2 = get_obj_obs(K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, observation_space:],
+                             K.tensor(batch['g'], dtype=self.dtype, device=self.device), 
+                             n_object=self.n_objects)
 
         a1 = K.tensor(batch['u'], dtype=self.dtype, device=self.device)[:, 0:action_space]
         a2 = K.tensor(batch['u'], dtype=self.dtype, device=self.device)[:, action_space:]
 
         s1_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, 0:observation_space],
                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
-        s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
-                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+
+        if self.n_objects <= 1:
+            s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
+                         K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+        else:
+            s2_ = get_obj_obs(K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
+                              K.tensor(batch['g'], dtype=self.dtype, device=self.device), 
+                              n_object=self.n_objects)
 
         if normalizer[0] is not None:
             s1 = normalizer[0].preprocess(s1)
             s1_ = normalizer[0].preprocess(s1_)
 
-        if self.n_objects > 1:
-            obj_state_space = s2.shape[1] // self.n_objects
-            s2 = s2.view(-1, self.n_objects, obj_action_space)
-            s2_ = s2_.view(-1, self.n_objects, obj_action_space)
-            if normalizer[1] is not None:
-                for i_object in range(self.n_objects):
-                    s2[:,i_object,:] = normalizer[1].preprocess(s2)
-                    s2_ = normalizer[1].preprocess(s2_)
-        else:
-            if normalizer[1] is not None:
+        if normalizer[1] is not None:
+            if self.n_objects <= 1:
                 s2 = normalizer[1].preprocess(s2)
                 s2_ = normalizer[1].preprocess(s2_)
+            else:
+                for i_object in range(self.n_objects):
+                    s2[:,:,i_object] = normalizer[1].preprocess(s2[:,:,i_object])
+                    s2_[:,:,i_object] = normalizer[1].preprocess(s2_[:,:,i_object])
 
         s, s_, a = (s1, s1_, a1) if self.agent_id == 0 else (s2, s2_, a2)
         a_ = self.actors_target[0](s_)
@@ -173,7 +182,13 @@ class DDPG_BD(object):
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
         else:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
-            r = self.get_obj_reward(s2, s2_) * K.abs(r) + r
+            if self.n_objects <= 1:
+                r_intr = self.get_obj_reward(s2, s2_)
+            else:
+                r_intr = K.zeros_like(r)
+                for i_object in range(self.n_objects):
+                    r_intr += self.get_obj_reward(s2[:,:,i_object], s2_[:,:,i_object])
+            r = r_intr * K.abs(r) + r
 
         Q = self.critics[0](s, a)       
         V = self.critics_target[0](s_, a_).detach()
@@ -182,7 +197,7 @@ class DDPG_BD(object):
         if self.object_Qfunc is None:
             target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
         else:
-            target_Q = target_Q.clamp(-2/(1.-self.gamma), 0.)
+            target_Q = target_Q.clamp(-(1+self.n_objects)/(1.-self.gamma), 0.)
 
         loss_critic = self.loss_func(Q, target_Q)
 

@@ -46,6 +46,39 @@ def plot_durations(durations):
 
     plt.pause(0.001)  # pause a bit so that plots are updated
 
+def get_obj_obs(obs, goal, n_object):
+    
+    l_x = 2
+    l_y = 3
+    l_z = 1
+    
+    l_a = 3
+    l_b = l_a+3*l_x*n_object
+    l_c = l_b+2
+    l_d = l_c+3*l_y*n_object
+    l_e = l_d+6
+    
+    ind1 = slice(0,l_a)
+    ind2 = slice(l_a,l_b)
+    ind3 = slice(l_b,l_c)
+    ind4 = slice(l_c,l_d)
+    ind5 = slice(l_d,l_e)
+    
+    obj_obs_all = []
+    for i in range (n_object):
+        obj_obs = K.cat((obs[:,ind1],
+                         obs[:,ind2].view(-1,l_x,n_object,3)[:,:,i,:].contiguous().view(-1,3*l_x),
+                         obs[:,ind3],
+                         obs[:,ind4].view(-1,l_y,n_object,3)[:,:,i,:].contiguous().view(-1,3*l_y),
+                         obs[:,ind5],
+                         goal.view(-1,l_z,n_object,3)[:,:,i,:].contiguous().view(-1,3*l_z)), dim=-1)
+        
+        obj_obs_all.append(obj_obs)
+        
+    obj_obs_all = K.stack(obj_obs_all, dim=-1)
+    
+    return obj_obs_all
+
 
 def get_params(args=[], verbose=False):
 
@@ -292,6 +325,7 @@ def get_params(args=[], verbose=False):
 
 
     return args
+
 
 class Summarizer:
     """
