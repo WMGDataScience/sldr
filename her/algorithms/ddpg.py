@@ -22,7 +22,7 @@ def hard_update(target, source):
 class DDPG_BD(object):
     def __init__(self, observation_space, action_space, optimizer, Actor, Critic, loss_func, gamma, tau, out_func=K.sigmoid,
                  discrete=True, regularization=False, normalized_rewards=False, agent_id=0, object_Qfunc=None, backward_dyn=None, 
-                 object_policy=None, reward_fun=None, dtype=K.float32, device="cuda"):
+                 object_policy=None, reward_fun=None, masked_with_r=False, dtype=K.float32, device="cuda"):
 
         super(DDPG_BD, self).__init__()
 
@@ -43,6 +43,7 @@ class DDPG_BD(object):
         self.agent_id = agent_id
         self.object_Qfunc = object_Qfunc
         self.object_policy = object_policy
+        self.masked_with_r = masked_with_r
 
         # model initialization
         self.entities = []
@@ -163,7 +164,10 @@ class DDPG_BD(object):
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
         else:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
-            r = self.get_obj_reward(s2, s2_) * K.abs(r) + r
+            if self.masked_with_r:
+                r = self.get_obj_reward(s2, s2_) * K.abs(r) + r
+            else:
+                r = self.get_obj_reward(s2, s2_) + r
 
         Q = self.critics[0](s, a)       
         V = self.critics_target[0](s_, a_).detach()

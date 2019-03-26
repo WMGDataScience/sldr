@@ -229,6 +229,10 @@ def get_params(args=[], verbose=False):
     parser.add_argument('--max_grad_norm',type=float,default=0.5,
         help='max norm of gradients (default: 0.5)')
 
+    parser.add_argument("--masked_with_r", default="False",
+                        choices=['True', 'False'],
+                        help="Masking intrinsic rewards with true reward")
+
 
     # acquire in a dict
     config = parser.parse_args(args)
@@ -305,6 +309,13 @@ def get_params(args=[], verbose=False):
         args['observe_obj_grp'] = True
     else:
         args['observe_obj_grp'] = False
+
+    # object type observablity
+    if args['masked_with_r'] == 'True':
+        args['masked_with_r'] = True
+    else:
+        args['masked_with_r'] = False
+
 
     # object type observablity
     if args['use_gae'] == 'True':

@@ -94,7 +94,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                   Actor, Critic, loss_func, GAMMA, TAU, out_func=OUT_FUNC, discrete=False, 
                   regularization=REGULARIZATION, normalized_rewards=NORMALIZED_REWARDS,
                   agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
-                  object_policy=object_policy, reward_fun=reward_fun)
+                  object_policy=object_policy, reward_fun=reward_fun, masked_with_r=config['masked_with_r'])
     normalizer = [Normalizer(), Normalizer()]
 
     #memory initilization  
@@ -171,8 +171,10 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
         if model.object_Qfunc is None:            
             episode_reward += reward
         else:
-            episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) * K.abs(reward) + reward)
-            #episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) + reward)
+            if model.masked_with_r:
+                episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) * K.abs(reward) + reward)
+            else:
+                episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) + reward)
 
         for i_agent in range(2):
             state = {

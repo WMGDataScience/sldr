@@ -106,13 +106,13 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                 eps=config['eps'], max_grad_norm=config['max_grad_norm'], use_clipped_value_loss=True,
                 out_func=OUT_FUNC, discrete=False, 
                 agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
-                object_policy=object_policy, reward_fun=reward_fun)
+                object_policy=object_policy, reward_fun=reward_fun, masked_with_r=config['masked_with_r'])
     else:  
         model = MODEL(observation_space, action_space, optimizer, Actor, Critic, 
                     loss_func, GAMMA, TAU, out_func=OUT_FUNC, discrete=False, 
                     regularization=REGULARIZATION, normalized_rewards=NORMALIZED_REWARDS,
                     agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
-                    object_policy=object_policy, reward_fun=reward_fun)  
+                    object_policy=object_policy, reward_fun=reward_fun, masked_with_r=config['masked_with_r'])  
    
     normalizer = [Normalizer(), Normalizer()]
 
@@ -198,7 +198,11 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
         if agent_id == 0:
             #reward = model.get_obj_reward(obs_goal[1], next_obs_goal[1]).cpu().numpy().squeeze(0) * np.abs(reward) * 0.90 + (reward)
             #reward = model.get_obj_reward(obs_goal[1], next_obs_goal[1]).cpu().numpy().squeeze(0) * np.abs(1) * 1 + (reward)
-            reward = model.get_obj_reward(obs_goal[1], next_obs_goal[1]).cpu().numpy().squeeze(0) * np.abs(reward) + (reward)
+            if model.masked_with_r:
+                reward = model.get_obj_reward(obs_goal[1], next_obs_goal[1]).cpu().numpy().squeeze(0) * np.abs(reward) + (reward)
+            else:
+                reward = model.get_obj_reward(obs_goal[1], next_obs_goal[1]).cpu().numpy().squeeze(0) + (reward)
+
 
         # for monitoring
         episode_reward += reward
