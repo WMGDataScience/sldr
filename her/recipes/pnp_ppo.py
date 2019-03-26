@@ -75,7 +75,7 @@ exp_args2=['--env_id', env_name,
           '--observe_obj_grp', 'True',
           '--plcy_lr', '3e-4',
           '--crtc_lr', '3e-4',
-          '--ppo_epoch', '3',
+          '--ppo_epoch', '1',
           '--entropy_coef', '0.00',
           '--clip_param', '0.1',
           '--use_gae', "True",]
