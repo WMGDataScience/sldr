@@ -168,11 +168,11 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
                 next_obs_goal[i_agent] = normalizer[i_agent].preprocess(next_obs_goal[i_agent])
 
         # for monitoring
-        if agent_id == 0:
+        if model.object_Qfunc is None:            
+            episode_reward += reward
+        else:
             episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) * K.abs(reward) + reward)
             #episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) + reward)
-        else:
-            episode_reward += reward
 
         for i_agent in range(2):
             state = {
