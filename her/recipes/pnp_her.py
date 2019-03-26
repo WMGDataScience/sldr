@@ -5,7 +5,7 @@ import time
 import torch as K
 
 from her.utils import get_params as get_params, running_mean
-from her.main_ppo import init, run
+from her.main import init, run
 
 import os
 filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
