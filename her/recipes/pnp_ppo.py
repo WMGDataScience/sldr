@@ -92,7 +92,7 @@ experiment_args2 = (env2, memory2, noise2, config2, normalizer2, agent_id2)
 
 monitor2 = run(model2, experiment_args2, train=True)
 
-path = './models/recent/rob_model_PnP_v4P_Norm_Slide_Clipped_Both_Masked_PlusR/'
+path = './models/recent/rob_model_PnP_v4P_Norm_Slide_Clipped_Both_Masked_PlusR_E1/'
 K.save(model2.critics[0].state_dict(), path + 'robot_Qfunc.pt')
 K.save(model2.actors[0].state_dict(), path + 'robot_policy.pt')
 K.save(model2.object_Qfunc.state_dict(), path + 'object_Qfunc.pt')
@@ -102,5 +102,5 @@ import pickle
 with open(path + 'normalizer.pkl', 'wb') as file:
     pickle.dump(normalizer2, file)
 
-np.save('./monitors/recent/monitor_FetchPickandPlaceMulti-v1_Rew_v4P_Norm_Slide_Clipped_Both_Masked_PlusR.npy', monitor2)
+np.save('./monitors/recent/monitor_FetchPickandPlaceMulti-v1_Rew_v4P_Norm_Slide_Clipped_Both_Masked_PlusR_E1.npy', monitor2)
 
