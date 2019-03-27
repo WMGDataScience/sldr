@@ -21,7 +21,6 @@ device = K.device("cuda" if K.cuda.is_available() else "cpu")
 dtype = K.float32
 
 exp_config = get_exp_params(sys.argv[1:])
-import pdb; pdb.set_trace() 
 ####################### loading object ###########################
 if exp_config['env'] == 'Push':
     env_name = 'FetchPickAndPlaceMulti-v1'
@@ -68,7 +67,7 @@ experiment_args = (env, memory, noise, config, normalizer, agent_id)
 ####################### loading object ###########################  
 
 ####################### training robot ###########################  
-for i_exp in range(exp_config['n_exp']):
+for i_exp in range(int(exp_config['n_exp'])):
     masked_with_r = exp_config['masked_with_r']
     if exp_config['use_her'] == 'True':
         use_her = True
