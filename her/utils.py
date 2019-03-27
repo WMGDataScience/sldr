@@ -239,19 +239,19 @@ def get_params(args=[], verbose=False):
     args   = vars(config)
 
     # set arguments which need dependencies
-    # dir_exp_name = '{}_{}_{}_{}'.format(str([datetime.date.today()][0]),
-    #                               args['env_id'],
-    #                               args['agent_type'],
-    #                               args['exp_id'])
+    dir_exp_name = '{}_{}_{}_{}'.format(str([datetime.date.today()][0]),
+                                  args['env_id'],
+                                  args['agent_type'],
+                                  args['exp_id'])
 
-    # args['dir_exp'] = '{}/{}'.format(args['dir_base'],dir_exp_name)
-    # args['dir_saved_models'] = '{}/saved_models'.format(args['dir_exp'])
-    # args['dir_summary_train'] = '{}/summary/train'.format(args['dir_exp'])
-    # args['dir_summary_test'] = '{}/summary/test'.format(args['dir_exp'])
-    # args['dir_monitor_train'] = '{}/monitor/train'.format(args['dir_exp'])
-    # args['dir_monitor_test'] = '{}/monitor/test'.format(args['dir_exp'])
-    # # get current process pid
-    # args['process_pid'] = os.getpid()
+    args['dir_exp'] = '{}/{}'.format(args['dir_base'],dir_exp_name)
+    args['dir_saved_models'] = '{}/saved_models'.format(args['dir_exp'])
+    args['dir_summary_train'] = '{}/summary/train'.format(args['dir_exp'])
+    args['dir_summary_test'] = '{}/summary/test'.format(args['dir_exp'])
+    args['dir_monitor_train'] = '{}/monitor/train'.format(args['dir_exp'])
+    args['dir_monitor_test'] = '{}/monitor/test'.format(args['dir_exp'])
+    # get current process pid
+    args['process_pid'] = os.getpid()
 
     # # creating folders:
     # directory = args['dir_exp']
