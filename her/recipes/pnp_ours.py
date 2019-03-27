@@ -84,8 +84,8 @@ for i_exp in range(int(exp_config['n_exp'])):
                 '--render', '0',
                 '--episode_length', '50',
                 '--gamma', '0.98',
-                '--n_episodes', '1',
-                '--n_cycles', '1',
+                '--n_episodes', '50',
+                '--n_cycles', '50',
                 '--batch_size', '256',
                 '--reward_normalization', 'False', 
                 '--ai_object_rate', '0.0',
@@ -118,8 +118,8 @@ for i_exp in range(int(exp_config['n_exp'])):
                 '--render', '1',
                 '--episode_length', '50',
                 '--gamma', '0.98',
-                '--n_episodes', '1',
-                '--n_cycles', '1',
+                '--n_episodes', '50',
+                '--n_cycles', '50',
                 '--n_rollouts', '38',
                 '--n_batches', '4',
                 '--batch_size', '256',
@@ -172,12 +172,12 @@ for i_exp in range(int(exp_config['n_exp'])):
     else:  
         print ("Successfully created the directory %s" % path)
 
-    K.save(model2.critics[0].state_dict(), path + 'robot_Qfunc.pt')
-    K.save(model2.actors[0].state_dict(), path + 'robot_policy.pt')
-    K.save(model2.object_Qfunc.state_dict(), path + 'object_Qfunc.pt')
-    K.save(model2.backward.state_dict(), path + 'backward_dyn.pt')
-    K.save(model2.object_policy.state_dict(), path + 'object_policy.pt')
-    with open(path + 'normalizer.pkl', 'wb') as file:
+    K.save(model2.critics[0].state_dict(), path + '/robot_Qfunc.pt')
+    K.save(model2.actors[0].state_dict(), path + '/robot_policy.pt')
+    K.save(model2.object_Qfunc.state_dict(), path + '/object_Qfunc.pt')
+    K.save(model2.backward.state_dict(), path + '/backward_dyn.pt')
+    K.save(model2.object_policy.state_dict(), path + '/object_policy.pt')
+    with open(path + '/normalizer.pkl', 'wb') as file:
         pickle.dump(normalizer2, file)
 
     path = './monitors/_recent/monitor_' + rob_name  + '_' + str(i_exp) + '.npy'
