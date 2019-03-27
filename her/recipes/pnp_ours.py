@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 
 import os
 import pickle
+import sys
 
 filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
 os.chdir(filepath)
@@ -19,12 +20,12 @@ os.chdir(filepath)
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
 dtype = K.float32
 
-exp_config = get_exp_params()
+exp_config = get_exp_params(sys.argv[1:])
 import pdb; pdb.set_trace() 
 ####################### loading object ###########################
-if exp_config['env'] is 'Push':
+if exp_config['env'] == 'Push':
     env_name = 'FetchPickAndPlaceMulti-v1'
-elif exp_config['env'] is 'PnP':
+elif exp_config['env'] == 'PnP':
     env_name = 'FetchPushMulti-v1'
 
 model_name = 'DDPG_BD'
@@ -52,9 +53,9 @@ model, experiment_args = init(config, agent='object', her=True,
 env, memory, noise, config, normalizer, agent_id = experiment_args
 
 #loading the object model
-if exp_config['env'] is 'Push':
+if exp_config['env'] == 'Push':
     path = './models/obj/obj_model_norm_slide/'
-elif exp_config['env'] is 'PnP':
+elif exp_config['env'] == 'PnP':
     path = './models/obj/obj_model_norm_slide_pnp/'
 
 model.critics[0].load_state_dict(K.load(path + 'object_Qfunc.pt'))
@@ -69,12 +70,12 @@ experiment_args = (env, memory, noise, config, normalizer, agent_id)
 ####################### training robot ###########################  
 for i_exp in range(exp_config['n_exp']):
     masked_with_r = exp_config['masked_with_r']
-    if exp_config['use_her'] is 'True':
+    if exp_config['use_her'] == 'True':
         use_her = True
     else:
         use_her = False
 
-    if exp_config['rob_model'] is 'DDPG':
+    if exp_config['rob_model'] == 'DDPG':
         model_name = 'DDPG_BD'
         exp_args2=['--env_id', env_name,
                 '--exp_id', model_name + '_foorob_' + str(i_exp),
@@ -108,7 +109,7 @@ for i_exp in range(exp_config['n_exp']):
 
         monitor2 = run(model2, experiment_args2, train=True)
 
-    elif exp_config['rob_model'] is 'PPO':
+    elif exp_config['rob_model'] == 'PPO':
         model_name = 'PPO_BD'
         exp_args2=['--env_id', env_name,
                 '--exp_id', model_name + '_foorob_' + str(i_exp),
@@ -151,9 +152,9 @@ for i_exp in range(exp_config['n_exp']):
         monitor2 = run_ppo(model2, experiment_args2, train=True)
 
     rob_name = exp_config['env']
-    if exp_config['rob_model'] is 'PPO':
+    if exp_config['rob_model'] == 'PPO':
         rob_name = rob_name + '_v4P_'
-    elif exp_config['rob_model'] is 'DDPG':
+    elif exp_config['rob_model'] == 'DDPG':
         if use_her:
             rob_name = rob_name + '_v4H_'
         else:
