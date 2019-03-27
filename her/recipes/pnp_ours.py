@@ -19,7 +19,8 @@ os.chdir(filepath)
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
 dtype = K.float32
 
-exp_config = get_exp_params(args=exp_args)
+exp_config = get_exp_params()
+import pdb; pdb.set_trace() 
 ####################### loading object ###########################
 if exp_config['env'] is 'Push':
     env_name = 'FetchPickAndPlaceMulti-v1'
