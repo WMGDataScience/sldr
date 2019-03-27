@@ -239,44 +239,44 @@ def get_params(args=[], verbose=False):
     args   = vars(config)
 
     # set arguments which need dependencies
-    dir_exp_name = '{}_{}_{}_{}'.format(str([datetime.date.today()][0]),
-                                  args['env_id'],
-                                  args['agent_type'],
-                                  args['exp_id'])
+    # dir_exp_name = '{}_{}_{}_{}'.format(str([datetime.date.today()][0]),
+    #                               args['env_id'],
+    #                               args['agent_type'],
+    #                               args['exp_id'])
 
-    args['dir_exp'] = '{}/{}'.format(args['dir_base'],dir_exp_name)
-    args['dir_saved_models'] = '{}/saved_models'.format(args['dir_exp'])
-    args['dir_summary_train'] = '{}/summary/train'.format(args['dir_exp'])
-    args['dir_summary_test'] = '{}/summary/test'.format(args['dir_exp'])
-    args['dir_monitor_train'] = '{}/monitor/train'.format(args['dir_exp'])
-    args['dir_monitor_test'] = '{}/monitor/test'.format(args['dir_exp'])
-    # get current process pid
-    args['process_pid'] = os.getpid()
+    # args['dir_exp'] = '{}/{}'.format(args['dir_base'],dir_exp_name)
+    # args['dir_saved_models'] = '{}/saved_models'.format(args['dir_exp'])
+    # args['dir_summary_train'] = '{}/summary/train'.format(args['dir_exp'])
+    # args['dir_summary_test'] = '{}/summary/test'.format(args['dir_exp'])
+    # args['dir_monitor_train'] = '{}/monitor/train'.format(args['dir_exp'])
+    # args['dir_monitor_test'] = '{}/monitor/test'.format(args['dir_exp'])
+    # # get current process pid
+    # args['process_pid'] = os.getpid()
 
-    # creating folders:
-    directory = args['dir_exp']
-    if os.path.exists(directory) and args['resume'] == '':
-        toDelete= input("{} already exists, delete it if do you want to continue. Delete it? (yes/no) ".\
-            format(directory))
+    # # creating folders:
+    # directory = args['dir_exp']
+    # if os.path.exists(directory) and args['resume'] == '':
+    #     toDelete= input("{} already exists, delete it if do you want to continue. Delete it? (yes/no) ".\
+    #         format(directory))
 
-        if toDelete.lower() == 'yes':
-            shutil.rmtree(directory)
-            print("Directory removed")
-        if toDelete == 'No':
-            print("It was not possible to continue, an experiment \
-                   folder is required.Terminiting here.")
-            sys.exit()
-    if os.path.exists(directory) == False and args['resume'] == '':
-        os.makedirs(directory)
-        os.makedirs(args['dir_saved_models'])
-        os.makedirs(args['dir_summary_train'])
-        os.makedirs(args['dir_summary_test'])
-        os.makedirs(args['dir_monitor_train'])
-        os.makedirs(args['dir_monitor_test'])
+    #     if toDelete.lower() == 'yes':
+    #         shutil.rmtree(directory)
+    #         print("Directory removed")
+    #     if toDelete == 'No':
+    #         print("It was not possible to continue, an experiment \
+    #                folder is required.Terminiting here.")
+    #         sys.exit()
+    # if os.path.exists(directory) == False and args['resume'] == '':
+    #     os.makedirs(directory)
+    #     os.makedirs(args['dir_saved_models'])
+    #     os.makedirs(args['dir_summary_train'])
+    #     os.makedirs(args['dir_summary_test'])
+    #     os.makedirs(args['dir_monitor_train'])
+    #     os.makedirs(args['dir_monitor_test'])
 
-    time.sleep(1)
-    with open(os.path.expanduser('{}/arguments.txt'.format(args['dir_exp'])), 'w+') as file:
-        file.write(json.dumps(args, indent=4, sort_keys=True))
+    # time.sleep(1)
+    # with open(os.path.expanduser('{}/arguments.txt'.format(args['dir_exp'])), 'w+') as file:
+    #     file.write(json.dumps(args, indent=4, sort_keys=True))
 
     if args['expmode'] == 'fast':
         args['batch_size'] = 8
@@ -538,3 +538,26 @@ class Saver:
         episode   = ckpt['episode']
 
         return self.args, episode, save_dict
+
+
+def get_exp_params(args=[], verbose=False):
+
+    print("\n\n\n\n")
+    print("==============================")
+    print("Acquiring Arguments")
+    print("==============================")
+
+
+    parser = argparse.ArgumentParser(description='Arguments')
+
+    # positional
+    parser.add_argument("--env")
+    parser.add_argument("--rob_model")
+    parser.add_argument("--use_her")
+    parser.add_argument("--masked_with_r")
+    # acquire in a dict
+    config = parser.parse_args(args)
+    args   = vars(config)
+
+
+    return args

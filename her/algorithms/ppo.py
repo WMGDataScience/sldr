@@ -15,7 +15,7 @@ class PPO_BD(object):
                  clip_param, ppo_epoch, num_mini_batch, value_loss_coef, entropy_coef,
                  eps=None, max_grad_norm=None, use_clipped_value_loss=True,
                  out_func=K.sigmoid, discrete=True, agent_id=0, object_Qfunc=None, backward_dyn=None, 
-                 object_policy=None, reward_fun=None, dtype=K.float32, device="cuda",
+                 object_policy=None, reward_fun=None, masked_with_r=False, dtype=K.float32, device="cuda",
                  ):
 
         super(PPO_BD, self).__init__()
@@ -44,6 +44,7 @@ class PPO_BD(object):
 
         self.dtype = dtype
         self.device = device
+        self.masked_with_r = masked_with_r
 
         # model initialization
         self.entities = []
