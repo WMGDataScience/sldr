@@ -280,13 +280,14 @@ def run(model, experiment_args, train=True):
 
         episode_reward_cycle = []
         episode_succeess_cycle = []
-        for i_rollout in range(N_TEST_ROLLOUTS):
+        for i_env in range(N_ROLLOUTS):
+            for i_rollout in range(N_TEST_ROLLOUTS):
             # Initialize the environment and state
-            render = config['render'] > 0 and i_episode % config['render'] == 0
-            _, episode_reward, success, _ = rollout(env, model, noise=False, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False)
+                render = config['render'] > 0 and i_episode % config['render'] == 0
+                _, episode_reward, success, _ = rollout(env, model, noise=False, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, i_env=i_env)
                 
-            episode_reward_cycle.append(episode_reward)
-            episode_succeess_cycle.append(success)
+                episode_reward_cycle.append(episode_reward)
+                episode_succeess_cycle.append(success)
         # <-- end loop: i_rollout 
             
         ### MONITORIRNG ###
