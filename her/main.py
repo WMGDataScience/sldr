@@ -32,8 +32,14 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     ENV_NAME = config['env_id'] 
     SEED = config['random_seed']
 
-    if (ENV_NAME == 'FetchStackMulti-v1') or (ENV_NAME == 'FetchPushMulti-v1') or (ENV_NAME == 'FetchPickAndPlaceMulti-v1') or (ENV_NAME == 'FetchSlideMulti-v1'):
+    if 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME:
         env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], obj_action_type=config['obj_action_type'], observe_obj_grp=config['observe_obj_grp'])
+        n_rob_actions = 4
+        n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
+    elif 'HandManipulate' in ENV_NAME and 'Multi' in ENV_NAME:
+        env = gym.make(ENV_NAME, obj_action_type=config['obj_action_type'])
+        n_rob_actions = 20
+        n_actions = 1 * len(config['obj_action_type']) + n_rob_actions
     else:
         env = gym.make(ENV_NAME)
 
@@ -50,11 +56,10 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     #    n_actions = config['max_nb_objects'] * 3 + 4
     #elif config['obj_action_type'] == 'rotation_only':
     #    n_actions = config['max_nb_objects'] * 4 + 4
-    n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + 4
 
     observation_space = env.observation_space.spaces['observation'].shape[1] + env.observation_space.spaces['desired_goal'].shape[0]
-    action_space = (gym.spaces.Box(-1., 1., shape=(4,), dtype='float32'),
-                    gym.spaces.Box(-1., 1., shape=(n_actions-4,), dtype='float32'),
+    action_space = (gym.spaces.Box(-1., 1., shape=(n_rob_actions,), dtype='float32'),
+                    gym.spaces.Box(-1., 1., shape=(n_actions-n_rob_actions,), dtype='float32'),
                     gym.spaces.Box(-1., 1., shape=(n_actions,), dtype='float32'))
 
     GAMMA = config['gamma'] 
