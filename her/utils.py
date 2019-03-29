@@ -553,6 +553,7 @@ def get_exp_params(args=[], verbose=False):
     # positional
     parser.add_argument("--env")
     parser.add_argument("--rob_model")
+    parser.add_argument("--obj_rew")
     parser.add_argument("--use_her")
     parser.add_argument("--masked_with_r")
     parser.add_argument("--n_exp")
