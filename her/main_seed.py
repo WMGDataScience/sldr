@@ -52,7 +52,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
         return env[0].compute_reward(achieved_goal=ag_2, desired_goal=g, info=info)
     
     for i_env in range(N_ROLLOUTS):
-        env[i_env].seed(SEED+i_env)
+        env[i_env].seed(SEED+10*i_env)
     K.manual_seed(SEED)
     np.random.seed(SEED)
 
@@ -124,7 +124,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
 
     experiment_args = (env, memory, noise, config, normalizer, agent_id)
 
-    print('clipped between -1 and 0, and masked with abs(r), and + r')
+    print('multiseeding')
           
     return model, experiment_args
 

@@ -118,7 +118,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
 
     experiment_args = (env, memory, noise, config, normalizer, agent_id)
 
-    print('clipped between -1 and 0, and masked with abs(r), and + r')
+    print('singleseeding')
           
     return model, experiment_args
 

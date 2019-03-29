@@ -27,6 +27,14 @@ if exp_config['env'] == 'Push':
 elif exp_config['env'] == 'PnP':
     env_name = 'FetchPickAndPlaceMulti-v1'
 
+if exp_config['multiseed'] == 'True':
+    multiseed = True
+    from her.main_seed import init, run
+elif exp_config['multiseed'] == 'False':
+    multiseed = False
+    from her.main import init, run
+
+
 model_name = 'DDPG_BD'
 exp_args=['--env_id', env_name,
           '--exp_id', model_name + '_fooobj_' + str(0),
@@ -75,10 +83,12 @@ for i_exp in range(int(exp_config['n_exp'])):
         use_her = False
 
     if exp_config['obj_rew'] == 'True':
+        obj_rew = True
         object_Qfunc = model.critics[0]
         backward_dyn = model.backward
         object_policy = model.actors[0]
     elif exp_config['obj_rew'] == 'False':
+        obj_rew = False
         object_Qfunc = None
         backward_dyn = None
         object_policy = None
@@ -161,17 +171,32 @@ for i_exp in range(int(exp_config['n_exp'])):
 
     rob_name = exp_config['env']
     if exp_config['rob_model'] == 'PPO':
-        rob_name = rob_name + '_v4P_'
-    elif exp_config['rob_model'] == 'DDPG':
-        if use_her:
-            rob_name = rob_name + '_v4H_'
+        if obj_rew:
+            rob_name = rob_name + '_v4_PPO_'
         else:
-            rob_name = rob_name + '_v4_'
+            rob_name = rob_name + '_PPO_'
+    elif exp_config['rob_model'] == 'DDPG':
+        if obj_rew:
+            if use_her:
+                rob_name = rob_name + '_v4_HER_'
+            else:
+                rob_name = rob_name + '_v4_DDPG_'
+        else:
+            if use_her:
+                rob_name = rob_name + '_HER_'
+            else:
+                rob_name = rob_name + '_DDPG_'
+
     rob_name = rob_name + 'Norm_Slide_Clipped_Both_'
     if masked_with_r:
         rob_name = rob_name + 'Masked_PlusR'
     else:
         rob_name = rob_name + 'PlusR'
+
+    if multiseed:
+        rob_name = rob_name + '_Multiseed'
+    else:
+        rob_name = rob_name + '_Singleseed'
 
     path = './models/_recent/rob_model_' + rob_name + '_' + str(i_exp)
     try:  

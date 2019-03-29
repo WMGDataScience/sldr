@@ -557,6 +557,7 @@ def get_exp_params(args=[], verbose=False):
     parser.add_argument("--use_her")
     parser.add_argument("--masked_with_r")
     parser.add_argument("--n_exp")
+    parser.add_argument("--multiseed")
     # acquire in a dict
     config = parser.parse_args(args)
     args   = vars(config)
