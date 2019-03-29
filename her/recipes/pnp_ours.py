@@ -29,10 +29,12 @@ elif exp_config['env'] == 'PnP':
 
 if exp_config['multiseed'] == 'True':
     multiseed = True
+    n_test_rollouts = 10
     from her.main_seed import init, run
 elif exp_config['multiseed'] == 'False':
     multiseed = False
     from her.main import init, run
+    n_test_rollouts = 380
 
 
 model_name = 'DDPG_BD'
@@ -112,7 +114,7 @@ for i_exp in range(int(exp_config['n_exp'])):
                 '--max_nb_objects', '1',
                 '--observe_obj_grp', 'True',
                 '--masked_with_r', masked_with_r,
-                '--n_test_rollouts', '100'
+                '--n_test_rollouts', str(n_test_rollouts)
                 ]
 
         config2 = get_params(args=exp_args2)
