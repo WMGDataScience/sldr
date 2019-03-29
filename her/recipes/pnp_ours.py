@@ -23,9 +23,9 @@ dtype = K.float32
 exp_config = get_exp_params(sys.argv[1:])
 ####################### loading object ###########################
 if exp_config['env'] == 'Push':
-    env_name = 'FetchPickAndPlaceMulti-v1'
-elif exp_config['env'] == 'PnP':
     env_name = 'FetchPushMulti-v1'
+elif exp_config['env'] == 'PnP':
+    env_name = 'FetchPickAndPlaceMulti-v1'
 
 model_name = 'DDPG_BD'
 exp_args=['--env_id', env_name,
@@ -74,6 +74,15 @@ for i_exp in range(int(exp_config['n_exp'])):
     else:
         use_her = False
 
+    if exp_config['obj_rew'] == 'True':
+        object_Qfunc = model.critics[0]
+        backward_dyn = model.backward
+        object_policy = model.actors[0]
+    elif exp_config['obj_rew'] == 'False':
+        object_Qfunc = None
+        backward_dyn = None
+        object_policy = None
+        
     if exp_config['rob_model'] == 'DDPG':
         model_name = 'DDPG_BD'
         exp_args2=['--env_id', env_name,
@@ -98,9 +107,9 @@ for i_exp in range(int(exp_config['n_exp'])):
 
         config2 = get_params(args=exp_args2)
         model2, experiment_args2 = init(config2, agent='robot', her=use_her, 
-                                        object_Qfunc=model.critics[0], 
-                                        backward_dyn=model.backward,
-                                        object_policy=model.actors[0]
+                                        object_Qfunc=object_Qfunc, 
+                                        backward_dyn=backward_dyn,
+                                        object_policy=object_policy
                                     )
         env2, memory2, noise2, config2, normalizer2, agent_id2 = experiment_args2
         normalizer2[1] = normalizer[1]
@@ -140,9 +149,9 @@ for i_exp in range(int(exp_config['n_exp'])):
 
         config2 = get_params(args=exp_args2)
         model2, experiment_args2 = init_ppo(config2, agent='robot', her=False, 
-                                        object_Qfunc=model.critics[0], 
-                                        backward_dyn=model.backward,
-                                        object_policy=model.actors[0]
+                                        object_Qfunc=object_Qfunc, 
+                                        backward_dyn=backward_dyn,
+                                        object_policy=object_policy
                                     )
         env2, memory2, noise2, config2, normalizer2, agent_id2 = experiment_args2
         normalizer2[1] = normalizer[1]
