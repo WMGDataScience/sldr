@@ -77,7 +77,7 @@ experiment_args = (env, memory, noise, config, normalizer, agent_id)
 ####################### loading object ###########################  
 
 ####################### training robot ###########################  
-for i_exp in range(int(exp_config['n_exp'])):
+for i_exp in range(1,int(exp_config['n_exp'])):
     masked_with_r = exp_config['masked_with_r']
     if exp_config['use_her'] == 'True':
         use_her = True
@@ -210,9 +210,11 @@ for i_exp in range(int(exp_config['n_exp'])):
 
     K.save(model2.critics[0].state_dict(), path + '/robot_Qfunc.pt')
     K.save(model2.actors[0].state_dict(), path + '/robot_policy.pt')
-    K.save(model2.object_Qfunc.state_dict(), path + '/object_Qfunc.pt')
-    K.save(model2.backward.state_dict(), path + '/backward_dyn.pt')
-    K.save(model2.object_policy.state_dict(), path + '/object_policy.pt')
+    if obj_rew:
+        K.save(model2.object_Qfunc.state_dict(), path + '/object_Qfunc.pt')
+        K.save(model2.backward.state_dict(), path + '/backward_dyn.pt')
+        K.save(model2.object_policy.state_dict(), path + '/object_policy.pt')
+    
     with open(path + '/normalizer.pkl', 'wb') as file:
         pickle.dump(normalizer2, file)
 
