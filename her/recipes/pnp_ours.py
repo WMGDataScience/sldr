@@ -77,7 +77,7 @@ experiment_args = (env, memory, noise, config, normalizer, agent_id)
 ####################### loading object ###########################  
 
 ####################### training robot ###########################  
-for i_exp in range(1,int(exp_config['n_exp'])):
+for i_exp in range(2,int(exp_config['n_exp'])):
     masked_with_r = exp_config['masked_with_r']
     if exp_config['use_her'] == 'True':
         use_her = True
