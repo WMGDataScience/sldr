@@ -113,14 +113,19 @@ class PPO_BD(object):
 
         return value, action, action_dist.log_probs(action)
 
-    def evaluate_actions(self, state, action):       
+    def evaluate_actions(self, state, action, get_preactivations=False):       
         value = self.critics[0](state.to(self.device))
         action_dist = self.actors[0](state.to(self.device))
 
         action_log_probs = action_dist.log_probs(action)
         dist_entropy = action_dist.entropies().mean()
 
-        return value, action_log_probs, dist_entropy
+        if get_preactivations:
+            action_preactivations = self.actors[0].get_preactivations(state.to(self.device))
+        else:
+            action_preactivations = None
+
+        return value, action_log_probs, dist_entropy, action_preactivations
 
     def reward_fun(self, state, next_state):
         with K.no_grad():
@@ -145,12 +150,13 @@ class PPO_BD(object):
                 obs_batch, actions_batch, value_preds_batch, return_batch, old_action_log_probs_batch, adv_targ = sample
 
                 # Reshape to do in a single forward pass for all steps
-                values, action_log_probs, dist_entropy  = self.evaluate_actions(obs_batch, actions_batch)
+                values, action_log_probs, dist_entropy, action_preactivations  = self.evaluate_actions(obs_batch, actions_batch, False)
 
                 ratio = K.exp(action_log_probs - old_action_log_probs_batch)
                 surr1 = ratio * adv_targ
                 surr2 = K.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * adv_targ
                 action_loss = -K.min(surr1, surr2).mean()
+                #action_loss += (action_preactivations**2).mean()*0.001
 
                 if self.use_clipped_value_loss:
                     value_pred_clipped = value_preds_batch + (values - value_preds_batch).clamp(-self.clip_param, self.clip_param)

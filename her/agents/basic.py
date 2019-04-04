@@ -244,6 +244,13 @@ class ActorStoch(nn.Module):
 
         return FixedNormal(x, action_logstd.exp())
 
+    def get_preactivations(self, s):
+        
+        x = s
+        x = self.FC(x)
+   
+        return x
+
 
 class ForwardDynReg(nn.Module):
     def __init__(self, observation_space, action_space):
