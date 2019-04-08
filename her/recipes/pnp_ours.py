@@ -29,13 +29,12 @@ elif exp_config['env'] == 'PnP':
 
 if exp_config['multiseed'] == 'True':
     multiseed = True
-    n_test_rollouts = 10
-    from her.main_seed import init, run
+    n_envs = 38
+    from her.main import init, run
 elif exp_config['multiseed'] == 'False':
     multiseed = False
+    n_envs = 1
     from her.main import init, run
-    n_test_rollouts = 380
-
 
 model_name = 'DDPG_BD'
 exp_args=['--env_id', env_name,
@@ -44,15 +43,20 @@ exp_args=['--env_id', env_name,
           '--agent_alg', model_name,
           '--verbose', '2',
           '--render', '0',
-          '--episode_length', '50',
           '--gamma', '0.98',
           '--n_episodes', '20',
           '--n_cycles', '50',
+          '--n_rollouts', '38',
+          '--n_test_rollouts', '10',
+          '--n_envs', str(n_envs),
+          '--n_batches', '40',
           '--batch_size', '256',
-          '--reward_normalization', 'False', 
+          '--n_bd_batches', '400',
           '--obj_action_type', '012',
           '--max_nb_objects', '1',
-          '--observe_obj_grp', 'True']
+          '--observe_obj_grp', 'False',
+          '--rob_policy', '01',
+          ]
 
 config = get_params(args=exp_args)
 model, experiment_args = init(config, agent='object', her=True, 
@@ -103,18 +107,20 @@ for i_exp in range(2,int(exp_config['n_exp'])):
                 '--agent_alg', model_name,
                 '--verbose', '2',
                 '--render', '0',
-                '--episode_length', '50',
                 '--gamma', '0.98',
                 '--n_episodes', '50',
                 '--n_cycles', '50',
+                '--n_rollouts', '38',
+                '--n_test_rollouts', '380',
+                '--n_envs', str(n_envs),
+                '--n_batches', '40',
                 '--batch_size', '256',
-                '--reward_normalization', 'False', 
-                '--ai_object_rate', '0.0',
+                '--n_bd_batches', '400',
                 '--obj_action_type', '012',
                 '--max_nb_objects', '1',
-                '--observe_obj_grp', 'True',
+                '--observe_obj_grp', 'False',
+                '--rob_policy', '01',
                 '--masked_with_r', masked_with_r,
-                '--n_test_rollouts', str(n_test_rollouts)
                 ]
 
         config2 = get_params(args=exp_args2)
@@ -137,7 +143,6 @@ for i_exp in range(2,int(exp_config['n_exp'])):
                 '--agent_alg', model_name,
                 '--verbose', '2',
                 '--render', '1',
-                '--episode_length', '50',
                 '--gamma', '0.98',
                 '--n_episodes', '50',
                 '--n_cycles', '50',
