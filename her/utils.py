@@ -178,7 +178,7 @@ def get_params(args=[], verbose=False):
     parser.add_argument('--max_nb_objects', default=1, type=int,\
                          help='number of objects to be used in the training')
 
-    parser.add_argument('--ai_object_rate', default=0.10, type=float,\
+    parser.add_argument('--ai_object_rate', default=0.00, type=float,\
                          help='the probability of intelligent object')
 
     parser.add_argument('--obj_action_type', default=[0,1,2], type=list,
