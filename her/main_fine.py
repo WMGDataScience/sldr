@@ -242,6 +242,7 @@ def run(model, experiment_args, train=True):
     N_BATCHES = config['n_batches']
     N_TEST_ROLLOUTS = config['n_test_rollouts']
     BATCH_SIZE = config['batch_size']
+    FT_RATE = config['ai_object_fine_tune_rate']
     
     episode_reward_all = []
     episode_success_all = []
@@ -274,7 +275,7 @@ def run(model, experiment_args, train=True):
 
                 model.update_target()
 
-                if agent_id==0 and i_cycle%config['ai_object_fine_tune_rate']==config['ai_object_fine_tune_rate']-1:
+                if agent_id==0 and i_cycle%FT_RATE==FT_RATE-1:
 
                     for i_rollout in range(N_ROLLOUTS):
                         render = config['render'] > 0 and i_rollout==N_ROLLOUTS-1
