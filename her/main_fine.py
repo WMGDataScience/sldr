@@ -274,7 +274,7 @@ def run(model, experiment_args, train=True):
 
                 model.update_target()
 
-                if i_cycle%config['ai_object_fine_tune_rate']==config['ai_object_fine_tune_rate']-1:
+                if agent_id==0 and i_cycle%config['ai_object_fine_tune_rate']==config['ai_object_fine_tune_rate']-1:
 
                     for i_rollout in range(N_ROLLOUTS):
                         render = config['render'] > 0 and i_rollout==N_ROLLOUTS-1
