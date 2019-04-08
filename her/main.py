@@ -33,7 +33,10 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     SEED = config['random_seed']
 
     if 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME:
-        env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], obj_action_type=config['obj_action_type'], observe_obj_grp=config['observe_obj_grp'])
+        env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], 
+                                 obj_action_type=config['obj_action_type'], 
+                                 observe_obj_grp=config['observe_obj_grp'],
+                                 obj_range=config['obj_range'])
         n_rob_actions = 4
         n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
     elif 'HandManipulate' in ENV_NAME and 'Multi' in ENV_NAME:
@@ -130,7 +133,11 @@ def rollout(env, model, noise, normalizer=None, render=False, agent_id=0, ai_obj
     frames = []
     
     env.env.ai_object = True if agent_id==1 else ai_object
+    env.env.deactivate_ai_object() 
     state_all = env.reset()
+
+    if agent_id == 1:
+        env.env.activate_ai_object() 
 
     for i_agent in range(2):
         trajectories.append([])
