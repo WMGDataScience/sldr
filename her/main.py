@@ -292,7 +292,6 @@ def run(model, experiment_args, train=True):
         for i_rollout in range(N_TEST_ROLLOUTS):
             # Initialize the environment and state
             rollout_per_env = N_TEST_ROLLOUTS // config['n_envs']
-            pdb.set_trace()
             i_env = i_rollout // rollout_per_env
             render = config['render'] > 0 and i_episode % config['render'] == 0 and i_env == 0
             _, episode_reward, success, _ = rollout(env, model, False, i_env, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
