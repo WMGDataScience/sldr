@@ -57,7 +57,7 @@ for i_exp in range(0,int(exp_config['n_exp'])):
                 '--n_episodes', '20',
                 '--n_cycles', '50',
                 '--n_rollouts', '38',
-                '--n_test_rollouts', '10',
+                '--n_test_rollouts', '38',
                 '--n_envs', str(n_envs),
                 '--n_batches', '40',
                 '--batch_size', '256',
