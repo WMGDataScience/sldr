@@ -119,8 +119,6 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     memory = ReplayBuffer(buffer_shapes, MEM_SIZE, env[0]._max_episode_steps, sample_her_transitions)
 
     experiment_args = (env, memory, noise, config, normalizer, agent_id)
-
-    print('singleseeding')
           
     return model, experiment_args
 
