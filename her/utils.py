@@ -192,6 +192,9 @@ def get_params(args=[], verbose=False):
                         choices=['True', 'False'],
                         help="wheather or not robot can observe object type") 
 
+    parser.add_argument("--obj_range", default=0.15, type=float,
+                        help="placement range of the objects")
+
     parser.add_argument('--n_cycles', default=50, type=int,\
                          help='number of cycles per iteration')
 
