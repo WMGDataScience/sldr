@@ -195,6 +195,9 @@ def get_params(args=[], verbose=False):
     parser.add_argument("--obj_range", default=0.15, type=float,
                         help="placement range of the objects")
 
+    parser.add_argument('--ai_object_fine_tune_rate', default=10, type=int,\
+                         help='number of robot updates for each fine object tune')  
+
     parser.add_argument('--n_cycles', default=50, type=int,\
                          help='number of cycles per iteration')
 
