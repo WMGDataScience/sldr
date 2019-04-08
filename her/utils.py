@@ -165,7 +165,7 @@ def get_params(args=[], verbose=False):
     parser.add_argument("--regularization", default="True",
                         choices=['True', 'False'],
                         help="Applying regulation to action preactivations")
-    parser.add_argument("--reward_normalization", default="True",
+    parser.add_argument("--reward_normalization", default="False",
                         choices=['True', 'False'],
                         help="Normalizing the rewards")
     parser.add_argument("--discrete_action", default="False",
@@ -205,9 +205,15 @@ def get_params(args=[], verbose=False):
 
     parser.add_argument('--n_batches', default=40, type=int,\
                          help='number of batch updates per cycle')
+
+    parser.add_argument('--n_bd_batches', default=1000000, type=int,\
+                         help='number of batch updates per cycle')
     
-    parser.add_argument('--n_test_rollouts', default=10, type=int,\
+    parser.add_argument('--n_test_rollouts', default=380, type=int,\
                          help='number of test rollouts per cycle')
+
+    parser.add_argument('--n_envs', default=38, type=int,\
+                         help='number of envs')
 
     parser.add_argument('--use_gae', default="True",
                         choices=['True', 'False'],
