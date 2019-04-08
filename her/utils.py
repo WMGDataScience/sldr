@@ -181,10 +181,6 @@ def get_params(args=[], verbose=False):
     parser.add_argument('--ai_object_rate', default=0.10, type=float,\
                          help='the probability of intelligent object')
 
-    #parser.add_argument('--obj_action_type', default='slide_only', type=str,
-    #                     choices=['all', 'slide_only', 'rotation_only'],
-    #                     help='the type objects actions')
-
     parser.add_argument('--obj_action_type', default=[0,1,2], type=list,
                          help='the indices of objects actions')
 
@@ -196,7 +192,10 @@ def get_params(args=[], verbose=False):
                         help="placement range of the objects")
 
     parser.add_argument('--ai_object_fine_tune_rate', default=10, type=int,\
-                         help='number of robot updates for each fine object tune')  
+                         help='number of robot updates for each fine object tune')
+
+    parser.add_argument('--rob_policy', default=[0., 0.], type=list,
+                         help='robot policy while training the objects')  
 
     parser.add_argument('--n_cycles', default=50, type=int,\
                          help='number of cycles per iteration')
@@ -333,6 +332,11 @@ def get_params(args=[], verbose=False):
     for i in args['obj_action_type']:
         obj_action_type.append(int(i))
     args['obj_action_type'] = obj_action_type
+
+    rob_policy = []
+    for i in args['rob_policy']:
+        rob_policy.append(float(i))
+    args['rob_policy'] = rob_policy
         
     if verbose:
         print("\n==> Arguments:")
