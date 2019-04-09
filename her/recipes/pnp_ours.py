@@ -77,9 +77,9 @@ for i_exp in range(0,int(exp_config['n_exp'])):
 
         #loading the object model
         if exp_config['env'] == 'Push':
-            path = './models/obj/obj_model_norm_slide/'
+            path = './models/obj/obj_push_xyz/'
         elif exp_config['env'] == 'PnP':
-            path = './models/obj/obj_model_norm_slide_pnp/'
+            path = './models/obj/obj_pnp_xyz/'
 
         model.critics[0].load_state_dict(K.load(path + 'object_Qfunc.pt'))
         model.backward.load_state_dict(K.load(path + 'backward_dyn.pt'))
