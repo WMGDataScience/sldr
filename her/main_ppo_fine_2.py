@@ -81,14 +81,10 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
         from her.replay_buffer import RolloutStorage as RolloutStorage
 
     #exploration initialization
+    env[0]._max_episode_steps *= config['max_nb_objects']
     noise = (True,
-            Noise(action_space[1].shape[0], sigma=0.2, eps=0.3)
+             Noise(action_space[1].shape[0], sigma=0.2, eps=0.3)
             )
-    if agent == 'robot':
-        agent_id = 0
-        env[0]._max_episode_steps *= config['max_nb_objects']
-    elif agent == 'object':
-        agent_id = 1
 
     #model initialization
     optimizer = (optim.Adam, (ACTOR_LR, CRITIC_LR)) # optimiser func, (actor_lr, critic_lr)
@@ -97,7 +93,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
             config['clip_param'], config['ppo_epoch'], config['n_batches'], config['value_loss_coef'], config['entropy_coef'],
             eps=config['eps'], max_grad_norm=config['max_grad_norm'], use_clipped_value_loss=True,
             out_func=OUT_FUNC, discrete=False, 
-            agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
+            agent_id=0, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
             object_policy=object_policy, reward_fun=reward_fun, masked_with_r=config['masked_with_r'])
     normalizer = [Normalizer(), Normalizer()]
 
@@ -117,7 +113,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
               ReplayBuffer(buffer_shapes, MEM_SIZE, env[0]._max_episode_steps, sample_her_transitions)
             )
 
-    experiment_args = (env, memory, noise, config, normalizer, agent_id)
+    experiment_args = (env, memory, noise, config, normalizer, 0)
           
     return model, experiment_args
 
@@ -130,13 +126,11 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False, agent_id=0,
     episode_reward = 0
     frames = []
     
-    env[i_env].env.ai_object = True if agent_id==1 else ai_object
+    env[i_env].env.ai_object = ai_object
     env[i_env].env.deactivate_ai_object() 
     state_all = env[i_env].reset()
 
-    if agent_id == 1:
-        env[i_env].env.activate_ai_object() 
-    elif agent_id == 0 and ai_object:
+    if ai_object:
         for i_step in range(env[0]._max_episode_steps):
             model.to_cpu()
 
@@ -182,25 +176,21 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False, agent_id=0,
             if normalizer[i_agent] is not None:
                 obs_goal[i_agent] = normalizer[i_agent].preprocess_with_update(obs_goal[i_agent])
 
-        value, action, log_probs = model.select_action(obs_goal[agent_id], noise[agent_id])
+        value, action, log_probs = model.select_action(obs_goal[0], noise[0])
         value = value.cpu().numpy().squeeze(0)
         action = action.cpu().numpy().squeeze(0)
         log_probs = log_probs.cpu().numpy().squeeze(0)
 
-        if agent_id == 0:
-            if ai_object:
-                action_to_env = env[0].action_space.sample() * rob_policy[0] + np.ones_like(env[0].action_space.sample()) * rob_policy[1]
-                action_to_env[action.shape[0]::] = model.get_obj_action(obs_goal[1], noise[1]).cpu().numpy().squeeze(0)
-            else:
-                action_to_env = np.zeros_like(env[0].action_space.sample())
-                action_to_env[0:action.shape[0]] = action
-        else:
+        if ai_object:
             action_to_env = env[0].action_space.sample() * rob_policy[0] + np.ones_like(env[0].action_space.sample()) * rob_policy[1]
-            action_to_env[-action.shape[0]::] = action
+            action_to_env[action.shape[0]::] = model.get_obj_action(obs_goal[1], noise[1]).cpu().numpy().squeeze(0)
+        else:
+            action_to_env = np.zeros_like(env[0].action_space.sample())
+            action_to_env[0:action.shape[0]] = action
 
         next_state_all, reward, done, info = env[i_env].step(action_to_env)
 
-        if agent_id == 0 and ai_object:
+        if ai_object:
             for i_agent in range(2):
                 state = {
                     'observation'   : state_all['observation'][i_agent],
@@ -224,12 +214,10 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False, agent_id=0,
                 if normalizer[i_agent] is not None:
                     next_obs_goal[i_agent] = normalizer[i_agent].preprocess(next_obs_goal[i_agent])
 
-            if agent_id == 0:
-                if model.masked_with_r:
-                    reward = model.get_obj_reward(obs_goal[1], next_obs_goal[1]).cpu().numpy().squeeze(0) * np.abs(reward) + (reward)
-                else:
-                    reward = model.get_obj_reward(obs_goal[1], next_obs_goal[1]).cpu().numpy().squeeze(0) + (reward)
-
+            if model.masked_with_r:
+                reward = model.get_obj_reward(obs_goal[1], next_obs_goal[1]).cpu().numpy().squeeze(0) * np.abs(reward) + (reward)
+            else:
+                reward = model.get_obj_reward(obs_goal[1], next_obs_goal[1]).cpu().numpy().squeeze(0) + (reward)
 
             # for monitoring
             episode_reward += reward
@@ -250,7 +238,7 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False, agent_id=0,
         if render:
             frames.append(env[i_env].render(mode='rgb_array')[0])
 
-    if agent_id == 0 and ai_object:
+    if ai_object:
         obs, ags, goals, acts = [], [], [], []
 
         for trajectory in trajectories:
@@ -296,7 +284,7 @@ def run(model, experiment_args, train=True):
 
     total_time_start =  time.time()
 
-    env, memory, noise, config, normalizer, agent_id = experiment_args
+    env, memory, noise, config, normalizer, _ = experiment_args
     
     N_EPISODES = config['n_episodes'] if train else config['n_episodes_test']
     N_CYCLES = config['n_cycles']
@@ -332,7 +320,7 @@ def run(model, experiment_args, train=True):
                     ai_object = 1 if np.random.rand() < config['ai_object_rate']  else 0
                     i_env = i_rollout % config['n_envs']
                     render = config['render'] > 0 and i_rollout==0
-                    trajectory, _, _, _ = rollout(env, model, noise, i_env, normalizer, render=render, agent_id=agent_id, ai_object=ai_object, rob_policy=config['rob_policy'])
+                    trajectory, _, _, _ = rollout(env, model, noise, i_env, normalizer, render=render, agent_id=0, ai_object=ai_object, rob_policy=config['rob_policy'])
                     if trajectories is None:
                         trajectories = trajectory.copy()
                     else:
@@ -356,19 +344,12 @@ def run(model, experiment_args, train=True):
                 actor_losses.append(actor_loss)
                 dist_entropies.append(dist_entropy)
 
-                if agent_id==1:
-                    for i_batch in range(N_BD_BATCHES):
-                        batch = memory[1].sample(BATCH_SIZE)
-                        backward_loss = model.update_backward(batch, normalizer)  
-                        if i_batch == N_BD_BATCHES - 1:
-                            backward_losses.append(backward_loss)
-
-                elif agent_id==0 and i_cycle%FT_RATE==FT_RATE-1:
+                if i_cycle%FT_RATE==FT_RATE-1:
 
                     for i_rollout in range(N_ROLLOUTS):
                         i_env = i_rollout % config['n_envs']
                         render = config['render'] > 0 and i_rollout==0
-                        trajectories, _, _, _ = rollout(env, model, noise, i_env, normalizer, render=render, agent_id=agent_id, ai_object=True, rob_policy=config['rob_policy'])
+                        trajectories, _, _, _ = rollout(env, model, noise, i_env, normalizer, render=render, agent_id=0, ai_object=True, rob_policy=config['rob_policy'])
                         memory[1].store_episode(trajectories.copy())
                         
                     for i_batch in range(N_BATCHES):  
@@ -395,7 +376,7 @@ def run(model, experiment_args, train=True):
             rollout_per_env = N_TEST_ROLLOUTS // config['n_envs']
             i_env = i_rollout // rollout_per_env
             render = config['render'] > 0 and i_episode % config['render'] == 0 and i_env == 0
-            _, episode_reward, success, _ = rollout(env, model, (False,False), i_env, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
+            _, episode_reward, success, _ = rollout(env, model, (False,False), i_env, normalizer=normalizer, render=render, agent_id=0, ai_object=False, rob_policy=config['rob_policy'])
    
             episode_reward_cycle.append(episode_reward.item())
             episode_succeess_cycle.append(success)
