@@ -342,6 +342,7 @@ def get_params(args=[], verbose=False):
     rob_policy = []
     for i in args['rob_policy']:
         rob_policy.append(float(i))
+    rob_policy[1] -= 1.0
     args['rob_policy'] = rob_policy
         
     if verbose:
