@@ -248,6 +248,7 @@ def run(model, experiment_args, train=True):
     critic_losses = []
     actor_losses = []
     backward_losses = []
+    rnd_losses = []
         
     for i_episode in range(N_EPISODES):
         
@@ -274,16 +275,16 @@ def run(model, experiment_args, train=True):
 
                 model.update_target()
 
-                if agent_id==1:
-                    for i_batch in range(N_BD_BATCHES):
-                        batch = memory.sample(BATCH_SIZE)
-                        backward_loss = model.update_backward(batch, normalizer)
-                        if i_batch == N_BD_BATCHES - 1:  
-                            backward_losses.append(backward_loss)
+                # if agent_id==1:
+                #     for i_batch in range(N_BD_BATCHES):
+                #         batch = memory.sample(BATCH_SIZE)
+                #         backward_loss = model.update_backward(batch, normalizer)
+                #         if i_batch == N_BD_BATCHES - 1:  
+                #             backward_losses.append(backward_loss)
 
             # <-- end loop: i_cycle
         plot_durations(np.asarray(critic_losses), np.asarray(actor_losses))
-        plot_durations(np.asarray(backward_losses), np.asarray(backward_losses))
+        #plot_durations(np.asarray(backward_losses), np.asarray(backward_losses))
 
         episode_reward_cycle = []
         episode_succeess_cycle = []
@@ -320,6 +321,27 @@ def run(model, experiment_args, train=True):
                 #print('  | Running mean of total reward: {}'.format(running_mean(episode_reward_all)[-1]))
                 print('  | Time episode: {}'.format(time.time()-episode_time_start))
                 print('  | Time total: {}'.format(time.time()-total_time_start))
+
+    if train and agent_id==1:
+        print('Training Backward Model')
+        model.to_cuda()
+        for _ in range(N_EPISODES*N_CYCLES):
+            for i_batch in range(N_BD_BATCHES):
+                batch = memory.sample(BATCH_SIZE)
+                backward_loss = model.update_backward(batch, normalizer)  
+                if i_batch == N_BD_BATCHES - 1:
+                    backward_losses.append(backward_loss)
+        plot_durations(np.asarray(backward_losses), np.asarray(backward_losses))
+
+        print('Training RND')
+        for _ in range(N_EPISODES*N_CYCLES):
+            for i_batch in range(N_BD_BATCHES):
+                batch = memory.sample(BATCH_SIZE)
+                rnd_loss = model.update_coverage(batch, normalizer)  
+                if i_batch == N_BD_BATCHES - 1:
+                    rnd_losses.append(rnd_loss)
+        plot_durations(np.asarray(rnd_losses), np.asarray(rnd_losses))
+
             
     # <-- end loop: i_episode
     if train:
