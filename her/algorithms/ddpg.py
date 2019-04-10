@@ -5,7 +5,7 @@ import torch.optim as optim
 
 import numpy as np
 
-from her.agents.basic import BackwardDyn
+from her.agents.basic import BackwardDyn, RandomNetDist
 
 import pdb
 
@@ -103,6 +103,14 @@ class DDPG_BD(object):
             self.get_obj_reward = reward_fun
         else:
             self.get_obj_reward = self.reward_fun
+
+        self.rnd_model = RandomNetDist(observation_space).to(device)
+        self.rnd_target = RandomNetDist(observation_space).to(device)
+        self.rnd_optim = optimizer(self.rnd_model.parameters(), lr = critic_lr)
+        
+        self.entities.append(self.rnd_model)
+        self.entities.append(self.rnd_target)
+        self.entities.append(self.rnd_optim)
 
         print('clipped between -1 and 0, and masked with abs(r), and + r')
 
@@ -248,3 +256,25 @@ class DDPG_BD(object):
         self.backward_optim.step()
 
         return loss_backward.item()
+
+    def update_coverage(self, batch, normalizer=None):
+        observation_space = self.observation_space - K.tensor(batch['g'], dtype=self.dtype, device=self.device).shape[1]
+
+        s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
+                K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+
+        if normalizer[1] is not None:
+            s2_ = normalizer[1].preprocess(s2_)
+
+        rnd_pred = self.rnd_model(s2_)
+        
+        with K.no_grad():
+            rnd_targ = self.rnd_target(s2_)
+
+        loss_rnd = self.loss_func(rnd_pred, rnd_targ.detach())
+
+        self.rnd_optim.zero_grad()
+        loss_rnd.backward()
+        self.rnd_optim.step()
+
+        return loss_rnd.item()
