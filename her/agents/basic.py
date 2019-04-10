@@ -569,3 +569,25 @@ class BackwardDyn(nn.Module):
         x = self.FC(x)
 
         return x
+
+
+class RandomNetDist(nn.Module):
+    def __init__(self, observation_space):
+        super(RandomNetDist, self).__init__()
+        
+        input_size = observation_space
+        hidden_size = 256
+        output_size = hidden_size
+
+        self.FC = nn.Sequential(
+                                nn.Linear(input_size, hidden_size), nn.ReLU(True),
+                                nn.Linear(hidden_size, hidden_size), nn.ReLU(True),
+                                nn.Linear(hidden_size, hidden_size), nn.ReLU(True),
+                                nn.Linear(hidden_size, output_size))
+        
+
+    def forward(self, x):
+
+        x = self.FC(x)
+
+        return x
