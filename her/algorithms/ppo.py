@@ -14,8 +14,10 @@ class PPO_BD(object):
     def __init__(self, observation_space, action_space, optimizer, Actor, Critic, 
                  clip_param, ppo_epoch, num_mini_batch, value_loss_coef, entropy_coef,
                  eps=None, max_grad_norm=None, use_clipped_value_loss=True,
-                 out_func=K.sigmoid, discrete=True, agent_id=0, object_Qfunc=None, backward_dyn=None, 
-                 object_policy=None, reward_fun=None, masked_with_r=False, dtype=K.float32, device="cuda",
+                 out_func=K.sigmoid, discrete=True, object_Qfunc=None, backward_dyn=None, 
+                 object_policy=None, reward_fun=None, masked_with_r=False, 
+                 rnd_model=None, rnd_target=None,
+                 dtype=K.float32, device="cuda",
                  ):
 
         super(PPO_BD, self).__init__()
@@ -37,7 +39,6 @@ class PPO_BD(object):
         self.use_clipped_value_loss = use_clipped_value_loss
 
         self.discrete = discrete
-        self.agent_id = agent_id
 
         self.object_Qfunc = object_Qfunc
         self.object_policy = object_policy
@@ -45,6 +46,9 @@ class PPO_BD(object):
         self.dtype = dtype
         self.device = device
         self.masked_with_r = masked_with_r
+
+        self.rnd_model = rnd_model
+        self.rnd_target = rnd_target
 
         # model initialization
         self.entities = []
@@ -54,7 +58,7 @@ class PPO_BD(object):
         self.critics = []
         self.optims = []
 
-        self.actors.append(Actor(observation_space, action_space[agent_id], discrete, out_func).to(device))
+        self.actors.append(Actor(observation_space, action_space[0], discrete, out_func).to(device))
         self.critics.append(Critic(observation_space, None).to(device))
 
         self.optims.append(optimizer(self.critics[0].parameters(), lr=actor_lr, eps=eps))
@@ -84,8 +88,14 @@ class PPO_BD(object):
             self.get_obj_reward = reward_fun
         else:
             self.get_obj_reward = self.reward_fun
+
+        if self.rnd_model is not None and self.rnd_target is not None:
+            self.rnd_model.eval()
+            self.rnd_target.eval()
+            self.entities.append(self.rnd_model)
+            self.entities.append(self.rnd_target)
         
-        print('clipped between -1 and 0, and masked with abs(r), and + r')
+        print('rnd_based_coverage')
 
     def to_cpu(self):
         for entity in self.entities:
@@ -109,7 +119,7 @@ class PPO_BD(object):
         else:
             action = action_dist.mode()
 
-        #action = action.clamp(int(self.action_space[self.agent_id].low[0]), int(self.action_space[self.agent_id].high[0]))
+        #action = action.clamp(int(self.action_space[0].low[0]), int(self.action_space[0].high[0]))
 
         return value, action, action_dist.log_probs(action)
 
@@ -134,6 +144,15 @@ class PPO_BD(object):
 
             reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
         return reward.clamp(min=-1.0, max=0.0)
+
+    def get_pred_error(self, next_state):
+        with K.no_grad():
+            target = self.rnd_target(next_state)
+            pred = self.rnd_model(next_state)
+            
+        error = F.mse_loss(pred, target)
+
+        return error
 
     def update(self, rollouts):
         advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
