@@ -82,6 +82,23 @@ class Normalizer(object):
             return 0.0, 1.0
         else:
             return self.Mean, np.sqrt(self.Var/(self.N-1))
+
+class RunningMean(object):
+    def __init__(self):
+        self.N = 0.0
+
+    def update_stats(self, x):
+        self.N += 1
+        if self.N == 1:
+            self.Mean = x
+        else:
+            self.Mean = self.Mean + (x - self.Mean)/self.N
+
+    def get_stats(self):
+        if self.N < 2:
+            return 0.0
+        else:
+            return self.Mean
         
 
     
