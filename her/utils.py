@@ -244,6 +244,9 @@ def get_params(args=[], verbose=False):
                         choices=['True', 'False'],
                         help="Masking intrinsic rewards with true reward")
 
+    parser.add_argument('--pred_th', type=float, default=0.0002,
+                        help='prediction error threshold)')
+
 
     # acquire in a dict
     config = parser.parse_args(args)
