@@ -22,7 +22,8 @@ def hard_update(target, source):
 class DDPG_BD(object):
     def __init__(self, observation_space, action_space, optimizer, Actor, Critic, loss_func, gamma, tau, out_func=K.sigmoid,
                  discrete=True, regularization=False, normalized_rewards=False, agent_id=0, object_Qfunc=None, backward_dyn=None, 
-                 object_policy=None, reward_fun=None, masked_with_r=False, dtype=K.float32, device="cuda"):
+                 object_policy=None, reward_fun=None, masked_with_r=False, rnd_models=None, pred_th=0.0002,
+                 dtype=K.float32, device="cuda"):
 
         super(DDPG_BD, self).__init__()
 
@@ -44,6 +45,7 @@ class DDPG_BD(object):
         self.object_Qfunc = object_Qfunc
         self.object_policy = object_policy
         self.masked_with_r = masked_with_r
+        self.pred_th = pred_th
 
         # model initialization
         self.entities = []
@@ -104,13 +106,19 @@ class DDPG_BD(object):
         else:
             self.get_obj_reward = self.reward_fun
 
-        self.rnd_model = RandomNetDist(observation_space).to(device)
-        self.rnd_target = RandomNetDist(observation_space).to(device)
-        self.rnd_optim = optimizer(self.rnd_model.parameters(), lr = critic_lr)
-        
+        if rnd_models is None:
+            self.rnd_model = RandomNetDist(observation_space).to(device)
+            self.rnd_target = RandomNetDist(observation_space).to(device)
+            self.rnd_optim = optimizer(self.rnd_model.parameters(), lr = critic_lr)
+
+            self.entities.append(self.rnd_optim)
+        else:
+            self.rnd_model = rnd_models[0]
+            self.rnd_target = rnd_models[1]
+
         self.entities.append(self.rnd_model)
         self.entities.append(self.rnd_target)
-        self.entities.append(self.rnd_optim)
+
 
         print('clipped between -1 and 0, and masked with abs(r), and + r')
 
@@ -137,7 +145,7 @@ class DDPG_BD(object):
 
         return mu
 
-    def update_parameters(self, batch, normalizer=None):
+    def update_parameters(self, batch, normalizer=None, running_rintr_mean=None):
 
         observation_space = self.observation_space - K.tensor(batch['g'], dtype=self.dtype, device=self.device).shape[1]
         action_space = self.action_space[0].shape[0]
@@ -164,18 +172,27 @@ class DDPG_BD(object):
         if normalizer[1] is not None:
             s2 = normalizer[1].preprocess(s2)
             s2_ = normalizer[1].preprocess(s2_)
-
+            
         s, s_, a = (s1, s1_, a1) if self.agent_id == 0 else (s2, s2_, a2)
         a_ = self.actors_target[0](s_)
-    
+
         if self.object_Qfunc is None:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
         else:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
-            if self.masked_with_r:
-                r = self.get_obj_reward(s2, s2_) * K.abs(r) + r
+
+            pred_error = self.get_pred_error(s2_)
+            mask = pred_error > self.pred_th
+            r_intr = self.get_obj_reward(s2, s2_)
+            if running_rintr_mean is not None:
+                r_intr[mask] =  K.tensor(running_rintr_mean.get_stats(), dtype=s2.dtype, device=s2.device)
             else:
-                r = self.get_obj_reward(s2, s2_) + r
+                r_intr[mask] = -0.5 
+
+            if self.masked_with_r:
+                r = r_intr * K.abs(r) + r
+            else:
+                r = r_intr + r
 
         Q = self.critics[0](s, a)       
         V = self.critics_target[0](s_, a_).detach()
@@ -256,6 +273,15 @@ class DDPG_BD(object):
         self.backward_optim.step()
 
         return loss_backward.item()
+
+    def get_pred_error(self, next_state):
+        with K.no_grad():
+            target = self.rnd_target(next_state)
+            pred = self.rnd_model(next_state)
+            
+        error = F.mse_loss(pred, target, reduction='none').mean(1)
+
+        return error
 
     def update_coverage(self, batch, normalizer=None):
         observation_space = self.observation_space - K.tensor(batch['g'], dtype=self.dtype, device=self.device).shape[1]
