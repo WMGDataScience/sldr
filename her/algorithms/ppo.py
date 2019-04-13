@@ -15,7 +15,7 @@ class PPO_BD(object):
                  clip_param, ppo_epoch, num_mini_batch, value_loss_coef, entropy_coef,
                  eps=None, max_grad_norm=None, use_clipped_value_loss=True,
                  out_func=K.sigmoid, discrete=True, object_Qfunc=None, backward_dyn=None, 
-                 object_policy=None, reward_fun=None, masked_with_r=False, rnd_models=None, pred_th=0.0002
+                 object_policy=None, reward_fun=None, masked_with_r=False, rnd_models=None, pred_th=0.0002,
                  dtype=K.float32, device="cuda",
                  ):
 
