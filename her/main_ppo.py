@@ -13,9 +13,9 @@ import gym_wmgds as gym
 from her.algorithms.ddpg import DDPG_BD
 from her.algorithms.maddpg import MADDPG_BD
 from her.algorithms.ppo import PPO_BD
-from her.experience import Normalizer
+from her.experience import Normalizer, RunningMean
 from her.exploration import Noise
-from her.utils import Saver, Summarizer, get_params, running_mean
+from her.utils import Saver, Summarizer, get_params
 from her.agents.basic import Critic
 from her.agents.basic import ActorStoch as Actor 
 from her.replay_buffer import RolloutStorage as ReplayBuffer
@@ -28,7 +28,11 @@ import matplotlib.pyplot as plt
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
 dtype = K.float32
 
-def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None, object_policy=None, reward_fun=None):
+def init(config, agent='robot', her=False, object_Qfunc=None, 
+                                           backward_dyn=None, 
+                                           object_policy=None, 
+                                           reward_fun=None,
+                                           rnd_models=None):
         
     #hyperparameters
     ENV_NAME = config['env_id'] 
@@ -77,7 +81,6 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     OUT_FUNC = 'linear'
 
     #exploration initialization
-    agent_id = 0
     noise = True
     env[0]._max_episode_steps *= config['max_nb_objects']
 
@@ -88,18 +91,24 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
             config['clip_param'], config['ppo_epoch'], config['n_batches'], config['value_loss_coef'], config['entropy_coef'],
             eps=config['eps'], max_grad_norm=config['max_grad_norm'], use_clipped_value_loss=True,
             out_func=OUT_FUNC, discrete=False, 
-            agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
-            object_policy=object_policy, reward_fun=reward_fun, masked_with_r=config['masked_with_r'])
+            object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
+            object_policy=object_policy, reward_fun=reward_fun, masked_with_r=config['masked_with_r'],
+            rnd_models=rnd_models, pred_th=config['pred_th'])
     normalizer = [Normalizer(), Normalizer()]
 
     #memory initilization  
     memory = ReplayBuffer(env[0]._max_episode_steps-1, config['n_rollouts'], (observation_space,), action_space[0])
 
-    experiment_args = (env, memory, noise, config, normalizer, agent_id)
+    running_rintr_mean = RunningMean()
+
+    experiment_args = (env, memory, noise, config, normalizer, running_rintr_mean)
           
     return model, experiment_args
 
-def rollout(env, model, noise, i_env, normalizer=None, render=False):
+ALL_COUNT = 0.
+NC_COUNT = 0.
+
+def rollout(env, model, noise, i_env, normalizer=None, render=False, running_rintr_mean=None):
     trajectories = []
     for i_agent in range(2):
         trajectories.append([])
@@ -124,7 +133,10 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False):
         for i_agent in range(2):
             obs_goal.append(K.cat([obs[i_agent], goal], dim=-1))
             if normalizer[i_agent] is not None:
-                obs_goal[i_agent] = normalizer[i_agent].preprocess_with_update(obs_goal[i_agent])
+                if i_agent == 0:
+                    obs_goal[i_agent] = normalizer[i_agent].preprocess_with_update(obs_goal[i_agent])
+                else:
+                    obs_goal[i_agent] = normalizer[i_agent].preprocess(obs_goal[i_agent])
 
         value, action, log_probs = model.select_action(obs_goal[0], noise)
         value = value.cpu().numpy().squeeze(0)
@@ -144,11 +156,28 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False):
             next_obs_goal.append(K.cat([next_obs[i_agent], goal], dim=-1))
             if normalizer[i_agent] is not None:
                 next_obs_goal[i_agent] = normalizer[i_agent].preprocess(next_obs_goal[i_agent])
+   
+        pred_error = model.get_pred_error(next_obs_goal[1]).cpu().numpy().squeeze(0)
+
+        global ALL_COUNT
+        global NC_COUNT
+
+        ALL_COUNT += 1.
+        if pred_error > model.pred_th:
+            NC_COUNT +=1.
+            if running_rintr_mean is not None:
+                r_intr = running_rintr_mean.get_stats()
+            else:
+                r_intr = -0.5
+        else:
+            r_intr = model.get_obj_reward(obs_goal[1], next_obs_goal[1]).cpu().numpy().squeeze(0)
+            if running_rintr_mean is not None:
+                running_rintr_mean.update_stats(r_intr)
 
         if model.masked_with_r:
-            reward = model.get_obj_reward(obs_goal[1], next_obs_goal[1]).cpu().numpy().squeeze(0) * np.abs(reward) + (reward)
+            reward = r_intr * np.abs(reward) + (reward)
         else:
-            reward = model.get_obj_reward(obs_goal[1], next_obs_goal[1]).cpu().numpy().squeeze(0) + (reward)
+            reward = r_intr + (reward)
 
         # for monitoring
         episode_reward += reward
@@ -193,7 +222,7 @@ def run(model, experiment_args, train=True):
 
     total_time_start =  time.time()
 
-    env, memory, noise, config, normalizer, agent_id = experiment_args
+    env, memory, noise, config, normalizer, running_rintr_mean = experiment_args
     
     N_EPISODES = config['n_episodes'] if train else config['n_episodes_test']
     N_CYCLES = config['n_cycles']
@@ -225,7 +254,7 @@ def run(model, experiment_args, train=True):
                     # Initialize the environment and state
                     i_env = i_rollout % config['n_envs']
                     render = config['render'] > 0 and i_rollout==0
-                    trajectory, _, _, _ = rollout(env, model, noise, i_env, normalizer, render=render)
+                    trajectory, _, _, _ = rollout(env, model, noise, i_env, normalizer, render=render, running_rintr_mean=running_rintr_mean)
                     if trajectories is None:
                         trajectories = trajectory.copy()
                     else:
@@ -249,6 +278,10 @@ def run(model, experiment_args, train=True):
                 actor_losses.append(actor_loss)
                 dist_entropies.append(dist_entropy)
 
+                if NC_COUNT > 0:
+                    print(NC_COUNT/ALL_COUNT)
+                    print(running_rintr_mean.get_stats())
+
             # <-- end loop: i_cycle
         plot_durations(np.asarray(critic_losses), np.asarray(critic_losses))
         plot_durations(np.asarray(actor_losses), np.asarray(actor_losses))
@@ -261,7 +294,7 @@ def run(model, experiment_args, train=True):
             rollout_per_env = N_TEST_ROLLOUTS // config['n_envs']
             i_env = i_rollout // rollout_per_env
             render = config['render'] > 0 and i_episode % config['render'] == 0 and i_env == 0
-            _, episode_reward, success, _ = rollout(env, model, False, i_env, normalizer=normalizer, render=render)
+            _, episode_reward, success, _ = rollout(env, model, False, i_env, normalizer=normalizer, render=render, running_rintr_mean=running_rintr_mean)
                 
             episode_reward_cycle.append(episode_reward.item())
             episode_succeess_cycle.append(success)

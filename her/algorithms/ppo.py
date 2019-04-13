@@ -15,8 +15,7 @@ class PPO_BD(object):
                  clip_param, ppo_epoch, num_mini_batch, value_loss_coef, entropy_coef,
                  eps=None, max_grad_norm=None, use_clipped_value_loss=True,
                  out_func=K.sigmoid, discrete=True, object_Qfunc=None, backward_dyn=None, 
-                 object_policy=None, reward_fun=None, masked_with_r=False, 
-                 rnd_model=None, rnd_target=None,
+                 object_policy=None, reward_fun=None, masked_with_r=False, rnd_models=None, pred_th=0.0002
                  dtype=K.float32, device="cuda",
                  ):
 
@@ -46,9 +45,7 @@ class PPO_BD(object):
         self.dtype = dtype
         self.device = device
         self.masked_with_r = masked_with_r
-
-        self.rnd_model = rnd_model
-        self.rnd_target = rnd_target
+        self.pred_th = pred_th
 
         # model initialization
         self.entities = []
@@ -89,9 +86,9 @@ class PPO_BD(object):
         else:
             self.get_obj_reward = self.reward_fun
 
-        if self.rnd_model is not None and self.rnd_target is not None:
-            self.rnd_model.eval()
-            self.rnd_target.eval()
+        if rnd_models is not None:
+            self.rnd_model = rnd_models[0]
+            self.rnd_target = rnd_models[1]
             self.entities.append(self.rnd_model)
             self.entities.append(self.rnd_target)
         
@@ -150,7 +147,7 @@ class PPO_BD(object):
             target = self.rnd_target(next_state)
             pred = self.rnd_model(next_state)
             
-        error = F.mse_loss(pred, target)
+        error = F.mse_loss(pred, target, reduction='none').mean(1)
 
         return error
 
