@@ -217,6 +217,8 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
     else:
         rob_name = rob_name + '_Singleseed'
 
+    rob_name = rob_name + str(exp_config['pred_th'])
+
     path = './models/_recent/rob_model_' + rob_name + '_' + str(i_exp)
     try:  
         os.makedirs(path)
