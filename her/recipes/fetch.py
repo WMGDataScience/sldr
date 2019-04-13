@@ -159,32 +159,33 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
                 '--n_episodes', '50',
                 '--n_cycles', '50',
                 '--n_rollouts', '38',
+                '--n_test_rollouts', '380',
+                '--n_envs', str(n_envs),
                 '--n_batches', '4',
                 '--batch_size', '256',
-                '--reward_normalization', 'False', 
-                '--ai_object_rate', '0.0',
                 '--obj_action_type', '0123456',
                 '--max_nb_objects', '1',
-                '--observe_obj_grp', 'True',
+                '--observe_obj_grp', 'False',
                 '--masked_with_r', masked_with_r,
-                '--n_test_rollouts', '100',
+                '--pred_th', str(exp_config['pred_th']),
                 '--plcy_lr', '3e-4',
                 '--crtc_lr', '3e-4',
                 '--ppo_epoch', '3',
                 '--entropy_coef', '0.00',
                 '--clip_param', '0.1',
-                '--use_gae', "False"
+                '--use_gae', "True",
         ]
 
         config2 = get_params(args=exp_args2)
         model2, experiment_args2 = init_ppo(config2, agent='robot', her=False, 
                                         object_Qfunc=object_Qfunc, 
                                         backward_dyn=backward_dyn,
-                                        object_policy=object_policy
+                                        object_policy=object_policy,
+                                        rnd_models=(rnd_model, rnd_target)
                                     )
-        env2, memory2, noise2, config2, normalizer2, agent_id2 = experiment_args2
+        env2, memory2, noise2, config2, normalizer2, running_rintr_mean2 = experiment_args2
         normalizer2[1] = normalizer[1]
-        experiment_args2 = (env2, memory2, noise2, config2, normalizer2, agent_id2)
+        experiment_args2 = (env2, memory2, noise2, config2, normalizer2, running_rintr_mean2)
 
         monitor2 = run_ppo(model2, experiment_args2, train=True)
 
