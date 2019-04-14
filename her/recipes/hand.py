@@ -88,6 +88,10 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
             path = './models/obj/egg_model_full_xyzrpy_rnd/'
         elif exp_config['env'] == 'EggFull':
             path = './models/obj/egg_model_full_xyzrpy_rnd/'
+        elif exp_config['env'] == 'BlockRotate':
+            path = './models/obj/block_model_full_xyzrpy_rnd/'
+        elif exp_config['env'] == 'BlockFull':
+            path = './models/obj/block_model_full_xyzrpy_rnd/'
 
         model.critics[0].load_state_dict(K.load(path + 'object_Qfunc.pt'))
         model.backward.load_state_dict(K.load(path + 'backward_dyn.pt'))
