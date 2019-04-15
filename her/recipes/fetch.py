@@ -16,6 +16,8 @@ import os
 import pickle
 import sys
 
+K.set_num_threads(2)
+
 filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
 os.chdir(filepath)
 
