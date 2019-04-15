@@ -120,7 +120,7 @@ class DDPG_BD(object):
         self.entities.append(self.rnd_target)
 
 
-        print('clipped between -1 and 0, and masked with abs(r), and + r')
+        print('rnd - xyz omitted')
 
     def to_cpu(self):
         for entity in self.entities:
@@ -172,7 +172,7 @@ class DDPG_BD(object):
         if normalizer[1] is not None:
             s2 = normalizer[1].preprocess(s2)
             s2_ = normalizer[1].preprocess(s2_)
-            
+
         s, s_, a = (s1, s1_, a1) if self.agent_id == 0 else (s2, s2_, a2)
         a_ = self.actors_target[0](s_)
 
@@ -243,6 +243,8 @@ class DDPG_BD(object):
         with K.no_grad():
             action = self.backward(state.to(self.device), next_state.to(self.device))
             opt_action = self.object_policy(state.to(self.device))
+            opt_action[:,0:3] = action[:,0:3]
+            #opt_action[:,3::] = action[:,3::]
 
             reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
         return reward.clamp(min=-1.0, max=0.0)
