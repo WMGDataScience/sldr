@@ -119,8 +119,7 @@ class DDPG_BD(object):
         self.entities.append(self.rnd_model)
         self.entities.append(self.rnd_target)
 
-
-        print('rnd - xyz omitted')
+        print('rnd')
 
     def to_cpu(self):
         for entity in self.entities:
@@ -243,8 +242,6 @@ class DDPG_BD(object):
         with K.no_grad():
             action = self.backward(state.to(self.device), next_state.to(self.device))
             opt_action = self.object_policy(state.to(self.device))
-            opt_action[:,0:3] = action[:,0:3]
-            #opt_action[:,3::] = action[:,3::]
 
             reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
         return reward.clamp(min=-1.0, max=0.0)
