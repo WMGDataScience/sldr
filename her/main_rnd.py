@@ -121,6 +121,8 @@ def init(config, agent='robot', her=False, object_Qfunc=None,
     running_rintr_mean = RunningMean()
 
     experiment_args = (env, memory, noise, config, normalizer, running_rintr_mean)
+
+    print('keep updating the normaliser')
           
     return model, experiment_args
 
@@ -155,7 +157,7 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False, running_rin
                 if i_agent == 0:
                     obs_goal[i_agent] = normalizer[i_agent].preprocess_with_update(obs_goal[i_agent])
                 else:
-                    obs_goal[i_agent] = normalizer[i_agent].preprocess(obs_goal[i_agent])
+                    obs_goal[i_agent] = normalizer[i_agent].preprocess_with_update(obs_goal[i_agent])
 
         action = model.select_action(obs_goal[0], noise).cpu().numpy().squeeze(0)
 
