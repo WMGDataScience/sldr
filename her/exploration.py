@@ -58,13 +58,14 @@ class Noise:
          self.eps = eps
          self.max_u = max_u
 
-    def noise(self):
-        return self.sigma*np.random.randn(self.action_dimension)
+    def noise(self, size):
+        return self.sigma*np.random.randn(*size)
 
-    def random_action(self):
-        return np.random.uniform(low=-self.max_u, high=self.max_u, size=self.action_dimension)
+    def random_action(self, size):
+        return np.random.uniform(low=-self.max_u, high=self.max_u, size=size)
 
     def get_noisy_action(self, x):
-        p = np.random.binomial(1,self.eps)
-        return p*self.random_action() + (1-p)*(x+self.noise()) 
+        size = (x.shape[0], self.action_dimension)
+        p = np.random.binomial(1, self.eps, size=(x.shape[0],1))
+        return p*self.random_action(size) + (1-p)*(x+self.noise(size)) 
 
