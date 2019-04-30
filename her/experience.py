@@ -42,16 +42,26 @@ class Normalizer(object):
         self.post_norm_clip = post_norm_clip
 
     def update_stats(self, x):
-        self.N += 1
-        if self.N == 1:
-            self.oldMean = x
-            self.Mean = x
-            self.Var = np.zeros_like(x)
-        else:
-            self.Mean = self.oldMean + (x - self.oldMean)/self.N
-            self.Var = self.Var + (x - self.oldMean)*(x - self.Mean)
-            self.oldMean = self.Mean
+        for foo in x:
+            self.N += 1
+            if self.N == 1:
+                self.oldMean = foo
+                self.Mean = foo
+                self.Var = K.zeros_like(foo)
+            else:
+                self.Mean = self.oldMean + (foo - self.oldMean)/self.N
+                self.Var = self.Var + (foo - self.oldMean)*(foo - self.Mean)
+                self.oldMean = self.Mean
 
+        # if self.N == 1:
+        #     self.oldMean = x.mean(dim=0,keepdim=True)
+        #     self.Mean = x.mean(dim=0,keepdim=True)
+        #     self.Var = K.zeros_like(self.Mean)
+        # else:
+        #     self.Mean = self.oldMean + (x.mean(dim=0,keepdim=True) - self.oldMean)/self.N
+        #     self.Var = self.Var + (x.mean(dim=0,keepdim=True) - self.oldMean)*(x.mean(dim=0,keepdim=True) - self.Mean)
+        #     self.oldMean = self.Mean
+        
     def preprocess(self, x):
         #pre-normalisation clipping
         x = x.clamp(-self.pre_norm_clip, self.pre_norm_clip)
@@ -88,12 +98,13 @@ class RunningMean(object):
         self.N = 0.0
 
     def update_stats(self, x):
-        self.N += 1
-        if self.N == 1:
-            self.Mean = x
-        else:
-            self.Mean = self.Mean + (x - self.Mean)/self.N
-
+        for foo in x:
+            self.N += 1
+            if self.N == 1:
+                self.Mean = foo
+            else:
+                self.Mean = self.Mean + (foo - self.Mean)/self.N
+        
     def get_stats(self):
         if self.N < 2:
             return 0.0
