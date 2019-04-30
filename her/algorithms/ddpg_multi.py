@@ -23,7 +23,7 @@ def hard_update(target, source):
 class DDPG_BD(object):
     def __init__(self, observation_space, action_space, optimizer, Actor, Critic, loss_func, gamma, tau, out_func=K.sigmoid,
                  discrete=True, regularization=False, normalized_rewards=False, agent_id=0, object_Qfunc=None, backward_dyn=None, 
-                 object_policy=None, reward_fun=None, n_objects=1, masked_with_r=False, dtype=K.float32, device="cuda"):
+                 object_policy=None, reward_fun=None, masked_with_r=False, n_objects=1, dtype=K.float32, device="cuda"):
 
         super(DDPG_BD, self).__init__()
 
@@ -44,8 +44,8 @@ class DDPG_BD(object):
         self.agent_id = agent_id
         self.object_Qfunc = object_Qfunc
         self.object_policy = object_policy
-        self.n_objects = n_objects
         self.masked_with_r = masked_with_r
+        self.n_objects = n_objects
 
         # model initialization
         self.entities = []
@@ -88,17 +88,14 @@ class DDPG_BD(object):
             self.entities.append(self.backward_optim)
         else:
             self.backward = backward_dyn
-            self.backward.eval()
             self.entities.append(self.backward)
 
         # Learnt Q function for object
         if self.object_Qfunc is not None:
-            self.object_Qfunc.eval()
             self.entities.append(self.object_Qfunc)
 
         # Learnt policy for object
         if self.object_policy is not None:
-            self.object_policy.eval()
             self.entities.append(self.object_policy)
 
         if reward_fun is not None:
@@ -106,7 +103,7 @@ class DDPG_BD(object):
         else:
             self.get_obj_reward = self.reward_fun
 
-        print('clipped between -1 and 0, and masked with abs(r), and + r')
+        print('rnd + r ')
 
     def to_cpu(self):
         for entity in self.entities:
@@ -245,31 +242,4 @@ class DDPG_BD(object):
             opt_action = self.object_policy(state.to(self.device))
 
             reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
-        return reward.clamp(min=-1.0, max=0.)
-
-    def update_backward(self, batch, normalizer=None):
-
-        observation_space = self.observation_space - K.tensor(batch['g'], dtype=self.dtype, device=self.device).shape[1]
-        action_space = self.action_space[0].shape[0]
-        
-        s2 = K.cat([K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, observation_space:],
-                    K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
-
-        a2 = K.tensor(batch['u'], dtype=self.dtype, device=self.device)[:, action_space:]
-
-        s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
-                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
-
-        if normalizer[1] is not None:
-            s2 = normalizer[1].preprocess(s2)
-            s2_ = normalizer[1].preprocess(s2_)
-
-        a2_pred = self.backward(s2, s2_)
-
-        loss_backward = self.loss_func(a2_pred, a2)
-
-        self.backward_optim.zero_grad()
-        loss_backward.backward()
-        self.backward_optim.step()
-
-        return loss_backward.item()
+        return reward.clamp(min=-1.0, max=0.0)
