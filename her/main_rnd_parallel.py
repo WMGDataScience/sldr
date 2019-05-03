@@ -108,7 +108,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None,
     #exploration initialization
     agent_id = 0
     noise = Noise(action_space[0].shape[0], sigma=0.2, eps=0.3)
-    config['episode_length'] = dummy_env._max_episode_steps * config['max_nb_objects']
+    config['episode_length'] = dummy_env._max_episode_steps
     config['observation_space'] = dummy_env.observation_space
 
     #model initialization
