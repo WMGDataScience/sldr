@@ -23,6 +23,8 @@ import pdb
 import matplotlib
 import matplotlib.pyplot as plt
 
+from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
+
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
 dtype = K.float32
 
@@ -37,33 +39,48 @@ def init(config, agent='robot', her=False, object_Qfunc=None,
     SEED = config['random_seed']
     N_ENVS = config['n_envs']
 
-    env = []
+    def make_env(env_id, i_env, env_type='Fetch'):
+        def _f():
+            if env_type == 'Fetch':
+                env = gym.make(env_id, n_objects=config['max_nb_objects'], 
+                                    obj_action_type=config['obj_action_type'], 
+                                    observe_obj_grp=config['observe_obj_grp'],
+                                    obj_range=config['obj_range'])
+            elif env_type == 'Hand':
+                env = gym.make(env_id, obj_action_type=config['obj_action_type'])
+            elif env_type == 'Others':
+                env = gym.make(env_id)
+            
+            keys = env.observation_space.spaces.keys()
+            env = gym.wrappers.FlattenDictWrapper(env, dict_keys=list(keys))
+            env.seed(SEED+10*i_env)
+            return env
+        return _f    
+
     if 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME:
-        for i_env in range(N_ENVS):
-            env.append(gym.make(ENV_NAME, n_objects=config['max_nb_objects'], 
-                                          obj_action_type=config['obj_action_type'], 
-                                          observe_obj_grp=config['observe_obj_grp'],
-                                          obj_range=config['obj_range']))
+        dummy_env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], 
+                                    obj_action_type=config['obj_action_type'], 
+                                    observe_obj_grp=config['observe_obj_grp'],
+                                    obj_range=config['obj_range'])
+        envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch') for i_env in range(N_ENVS)])
         n_rob_actions = 4
         n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
     elif 'HandManipulate' in ENV_NAME and 'Multi' in ENV_NAME:
-        for i_env in range(N_ENVS):
-            env.append(gym.make(ENV_NAME, obj_action_type=config['obj_action_type']))
+        dummy_env = gym.make(ENV_NAME, obj_action_type=config['obj_action_type'])
+        envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Hand') for i_env in range(N_ENVS)])
         n_rob_actions = 20
         n_actions = 1 * len(config['obj_action_type']) + n_rob_actions
     else:
-        for i_env in range(N_ENVS):
-            env.append(gym.make(ENV_NAME))
+        dummy_env = gym.make(ENV_NAME)
+        envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Others') for i_env in range(N_ENVS)])
 
     def her_reward_fun(ag_2, g, info):  # vectorized
-        return env[0].compute_reward(achieved_goal=ag_2, desired_goal=g, info=info)
+        return dummy_env.compute_reward(achieved_goal=ag_2, desired_goal=g, info=info)
 
-    for i_env in range(N_ENVS):
-        env[i_env].seed(SEED+10*i_env)
     K.manual_seed(SEED)
     np.random.seed(SEED)
 
-    observation_space = env[0].observation_space.spaces['observation'].shape[1] + env[0].observation_space.spaces['desired_goal'].shape[0]
+    observation_space = dummy_env.observation_space.spaces['observation'].shape[1] + dummy_env.observation_space.spaces['desired_goal'].shape[0]
     action_space = (gym.spaces.Box(-1., 1., shape=(n_rob_actions,), dtype='float32'),
                     gym.spaces.Box(-1., 1., shape=(n_actions-n_rob_actions,), dtype='float32'),
                     gym.spaces.Box(-1., 1., shape=(n_actions,), dtype='float32'))
@@ -91,7 +108,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None,
     #exploration initialization
     agent_id = 0
     noise = Noise(action_space[0].shape[0], sigma=0.2, eps=0.3)
-    env[0]._max_episode_steps *= config['max_nb_objects']
+    config['episode_length'] = dummy_env._max_episode_steps * config['max_nb_objects']
 
     #model initialization
     optimizer = (optim.Adam, (ACTOR_LR, CRITIC_LR)) # optimiser func, (actor_lr, critic_lr)
@@ -104,6 +121,31 @@ def init(config, agent='robot', her=False, object_Qfunc=None,
                   rnd_models=rnd_models, pred_th=config['pred_th'])
     normalizer = [Normalizer(), Normalizer()]
 
+    for _ in range(1):
+        state_all = dummy_env.reset()
+        for _ in range(config['episode_length']):
+
+            model.to_cpu()
+
+            obs = [K.tensor(obs, dtype=K.float32).unsqueeze(0) for obs in state_all['observation']]
+            goal = K.tensor(state_all['desired_goal'], dtype=K.float32).unsqueeze(0)
+
+            # Observation normalization
+            obs_goal = []
+            obs_goal.append(K.cat([obs[0], goal], dim=-1))
+            if normalizer[0] is not None:
+                obs_goal[0] = normalizer[0].preprocess_with_update(obs_goal[0])
+
+            action = model.select_action(obs_goal[0], noise).cpu().numpy().squeeze(0)
+            
+            action_to_env = np.zeros_like(dummy_env.action_space.sample())
+            action_to_env[0:action.shape[0]] = action
+
+            next_state_all, _, _, _ = dummy_env.step(action_to_env)
+
+            # Move to the next state
+            state_all = next_state_all
+
     #memory initilization  
     if her:
         sample_her_transitions = make_sample_her_transitions('future', 4, her_reward_fun)
@@ -111,16 +153,18 @@ def init(config, agent='robot', her=False, object_Qfunc=None,
         sample_her_transitions = make_sample_her_transitions('none', 4, her_reward_fun)
 
     buffer_shapes = {
-        'o' : (env[0]._max_episode_steps, env[0].observation_space.spaces['observation'].shape[1]*2),
-        'ag' : (env[0]._max_episode_steps, env[0].observation_space.spaces['achieved_goal'].shape[0]),
-        'g' : (env[0]._max_episode_steps, env[0].observation_space.spaces['desired_goal'].shape[0]),
-        'u' : (env[0]._max_episode_steps-1, action_space[2].shape[0])
+        'o' : (dummy_env._max_episode_steps, dummy_env.observation_space.spaces['observation'].shape[1]*2),
+        'ag' : (dummy_env._max_episode_steps, dummy_env.observation_space.spaces['achieved_goal'].shape[0]),
+        'g' : (dummy_env._max_episode_steps, dummy_env.observation_space.spaces['desired_goal'].shape[0]),
+        'u' : (dummy_env._max_episode_steps-1, action_space[2].shape[0])
         }
-    memory = ReplayBuffer(buffer_shapes, MEM_SIZE, env[0]._max_episode_steps, sample_her_transitions)
+    memory = ReplayBuffer(buffer_shapes, MEM_SIZE, dummy_env._max_episode_steps, sample_her_transitions)
 
     running_rintr_mean = RunningMean()
+    
+    config['observation_space'] = dummy_env.observation_space
 
-    experiment_args = (env, memory, noise, config, normalizer, running_rintr_mean)
+    experiment_args = (envs, memory, noise, config, normalizer, running_rintr_mean)
 
     print('keep updating the normaliser')
           
@@ -129,25 +173,39 @@ def init(config, agent='robot', her=False, object_Qfunc=None,
 ALL_COUNT = 0.
 NC_COUNT = 0.
 
-def rollout(env, model, noise, i_env, normalizer=None, render=False, running_rintr_mean=None):
+def back_to_dict(state, config):
+
+    goal_len = config['observation_space'].spaces['desired_goal'].shape[0]
+    obs_len = config['observation_space'].spaces['observation'].shape[1]
+    n_agents = config['observation_space'].spaces['observation'].shape[0]
+
+    state_dict = {}
+    state_dict['achieved_goal'] = state[:,0:goal_len]
+    state_dict['desired_goal'] = state[:,goal_len:goal_len*2]
+    state_dict['observation'] = state[:,goal_len*2::].reshape(-1,n_agents,obs_len).swapaxes(0,1)
+
+    return state_dict
+
+def rollout(env, model, noise, config, normalizer=None, render=False, running_rintr_mean=None,):
     trajectories = []
     for i_agent in range(2):
         trajectories.append([])
     
     # monitoring variables
-    episode_reward = 0
+    episode_reward = np.zeros(env.num_envs)
     frames = []
     
-    env[i_env].env.ai_object = False
-    env[i_env].env.deactivate_ai_object() 
-    state_all = env[i_env].reset()
+    #env[i_env].env.ai_object = False
+    #env[i_env].env.deactivate_ai_object() 
+    state_all = env.reset()
+    state_all = back_to_dict(state_all, config)
 
-    for i_step in range(env[0]._max_episode_steps):
+    for i_step in range(config['episode_length']):
 
         model.to_cpu()
 
-        obs = [K.tensor(obs, dtype=K.float32).unsqueeze(0) for obs in state_all['observation']]
-        goal = K.tensor(state_all['desired_goal'], dtype=K.float32).unsqueeze(0)
+        obs = [K.tensor(obs, dtype=K.float32) for obs in state_all['observation']]
+        goal = K.tensor(state_all['desired_goal'], dtype=K.float32)
 
         # Observation normalization
         obs_goal = []
@@ -159,15 +217,16 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False, running_rin
                 else:
                     obs_goal[i_agent] = normalizer[i_agent].preprocess_with_update(obs_goal[i_agent])
 
-        action = model.select_action(obs_goal[0], noise).cpu().numpy().squeeze(0)
+        action = model.select_action(obs_goal[0], noise).cpu().numpy()
 
-        action_to_env = np.zeros_like(env[0].action_space.sample())
-        action_to_env[0:action.shape[0]] = action
+        action_to_env = np.zeros((len(action), len(env.action_space.sample())))
+        action_to_env[:,0:action.shape[1]] = action
 
-        next_state_all, reward, done, info = env[i_env].step(action_to_env)
-        reward = K.tensor(reward, dtype=dtype).view(1,1)
+        next_state_all, reward, done, info = env.step(action_to_env)
+        next_state_all = back_to_dict(next_state_all, config)
+        reward = K.tensor(reward, dtype=dtype).view(-1,1)
 
-        next_obs = [K.tensor(next_obs, dtype=K.float32).unsqueeze(0) for next_obs in next_state_all['observation']]
+        next_obs = [K.tensor(next_obs, dtype=K.float32)for next_obs in next_state_all['observation']]
         
         # Observation normalization
         next_obs_goal = []
@@ -176,7 +235,7 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False, running_rin
             if normalizer[i_agent] is not None:
                 next_obs_goal[i_agent] = normalizer[i_agent].preprocess(next_obs_goal[i_agent])
 
-        pred_error = model.get_pred_error(next_obs_goal[1]).cpu().numpy().squeeze(0)
+        pred_error = model.get_pred_error(next_obs_goal[1])
 
         global ALL_COUNT
         global NC_COUNT
@@ -184,23 +243,21 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False, running_rin
         ALL_COUNT += 1.
         # for monitoring
         if model.object_Qfunc is None:            
-            episode_reward += reward
+            episode_reward += reward.squeeze(1).cpu().numpy()
         else:
-            if pred_error > model.pred_th:
-                NC_COUNT +=1.
-                if running_rintr_mean is not None:
-                    r_intr = K.tensor(running_rintr_mean.get_stats(), dtype=obs_goal[1].dtype, device=obs_goal[1].device)
-                else:
-                    r_intr = -0.5
+            mask = pred_error > model.pred_th
+            NC_COUNT += mask.sum().item()
+            r_intr = model.get_obj_reward(obs_goal[1], next_obs_goal[1])
+            if running_rintr_mean is not None:
+                running_rintr_mean.update_stats(r_intr[1-mask].cpu().numpy())
+                r_intr[mask] =  K.tensor(running_rintr_mean.get_stats(), dtype=obs_goal[1].dtype, device=obs_goal[1].device)
             else:
-                r_intr = model.get_obj_reward(obs_goal[1], next_obs_goal[1])
-                if running_rintr_mean is not None:
-                    running_rintr_mean.update_stats(r_intr.cpu().numpy().squeeze(0))
+                r_intr[mask] = -0.5 
 
             if model.masked_with_r:
-                episode_reward += (r_intr * K.abs(reward) + reward)
+                episode_reward += (r_intr * K.abs(reward) + reward).squeeze(1).cpu().numpy()
             else:
-                episode_reward += (r_intr + reward)
+                episode_reward += (r_intr + reward).squeeze(1).cpu().numpy()
 
         for i_agent in range(2):
             state = {
@@ -221,7 +278,7 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False, running_rin
 
         # Record frames
         if render:
-            frames.append(env[i_env].render(mode='rgb_array')[0])
+            frames.append(env.render(mode='rgb_array')[0])
 
     obs, ags, goals, acts = [], [], [], []
 
@@ -230,21 +287,23 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False, running_rin
         ags.append([])
         goals.append([])
         acts.append([])
-        for i_step in range(env[0]._max_episode_steps):
+        for i_step in range(config['episode_length']):
             obs[-1].append(trajectory[i_step][0]['observation'])
             ags[-1].append(trajectory[i_step][0]['achieved_goal'])
             goals[-1].append(trajectory[i_step][0]['desired_goal'])
-            if (i_step < env[0]._max_episode_steps - 1): 
+            if (i_step < config['episode_length'] - 1): 
                 acts[-1].append(trajectory[i_step][1])
 
     trajectories = {
-        'o'    : np.concatenate(obs,axis=1)[np.newaxis,:],
-        'ag'   : np.asarray(ags)[0:1,],
-        'g'    : np.asarray(goals)[0:1,],
-        'u'    : np.asarray(acts)[0:1,],
+        'o'    : np.concatenate(obs,axis=-1).swapaxes(0,1),
+        'ag'   : np.asarray(ags)[0,].swapaxes(0,1),
+        'g'    : np.asarray(goals)[0,].swapaxes(0,1),
+        'u'    : np.asarray(acts)[0,].swapaxes(0,1),
     }
 
-    return trajectories, episode_reward, info['is_success'], frames
+    info = np.asarray([i_info['is_success'] for i_info in info])
+
+    return trajectories, episode_reward, info, frames
 
 def run(model, experiment_args, train=True):
 
@@ -273,12 +332,9 @@ def run(model, experiment_args, train=True):
         if train:
             for i_cycle in range(N_CYCLES):
                 
-                for i_rollout in range(N_ROLLOUTS):
-                    # Initialize the environment and state
-                    i_env = i_rollout % config['n_envs']
-                    render = config['render'] > 0 and i_rollout==0
-                    trajectories, _, _, _ = rollout(env, model, noise, i_env, normalizer, render=render, running_rintr_mean=running_rintr_mean)
-                    memory.store_episode(trajectories.copy())   
+                #i_env = i_rollout % config['n_envs']
+                trajectories, _, _, _ = rollout(env, model, noise, config, normalizer, render=False, running_rintr_mean=running_rintr_mean)
+                memory.store_episode(trajectories.copy())   
               
                 for i_batch in range(N_BATCHES):  
                     model.to_cuda()
@@ -300,15 +356,13 @@ def run(model, experiment_args, train=True):
 
         episode_reward_cycle = []
         episode_succeess_cycle = []
-        for i_rollout in range(N_TEST_ROLLOUTS):
-            # Initialize the environment and state
-            rollout_per_env = N_TEST_ROLLOUTS // config['n_envs']
-            i_env = i_rollout // rollout_per_env
-            render = config['render'] > 0 and i_episode % config['render'] == 0 and i_env == 0
-            _, episode_reward, success, _ = rollout(env, model, False, i_env, normalizer=normalizer, render=render, running_rintr_mean=running_rintr_mean)
+        rollout_per_env = N_TEST_ROLLOUTS // config['n_envs']
+        for i_rollout in range(rollout_per_env):
+            render = config['render'] > 0 and i_episode % config['render'] == 0
+            _, episode_reward, success, _ = rollout(env, model, False, config, normalizer=normalizer, render=render, running_rintr_mean=running_rintr_mean)
                 
-            episode_reward_cycle.append(episode_reward.item())
-            episode_succeess_cycle.append(success)
+            episode_reward_cycle.extend(episode_reward)
+            episode_succeess_cycle.extend(success)
         # <-- end loop: i_rollout 
             
         ### MONITORIRNG ###
@@ -327,7 +381,6 @@ def run(model, experiment_args, train=True):
                 print('  | Exp description: {}'.format(config['exp_descr']))
                 print('  | Env: {}'.format(config['env_id']))
                 print('  | Process pid: {}'.format(config['process_pid']))
-                print('  | Episode total reward: {}'.format(episode_reward))
                 print('  | Running mean of total reward: {}'.format(episode_reward_mean[-1]))
                 print('  | Success rate: {}'.format(episode_success_mean[-1]))
                 print('  | Time episode: {}'.format(time.time()-episode_time_start))
