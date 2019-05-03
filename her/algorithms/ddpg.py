@@ -119,7 +119,7 @@ class DDPG_BD(object):
         self.entities.append(self.rnd_model)
         self.entities.append(self.rnd_target)
 
-        print('rnd')
+        print('rnd clipped + r')
 
     def to_cpu(self):
         for entity in self.entities:
