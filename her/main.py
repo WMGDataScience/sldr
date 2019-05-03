@@ -114,6 +114,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
         agent_id = 1
         noise = Noise(action_space[1].shape[0], sigma=0.2, eps=0.3)
         config['episode_length'] = dummy_env._max_episode_steps
+    config['observation_space'] = dummy_env.observation_space
 
     #model initialization
     optimizer = (optim.Adam, (ACTOR_LR, CRITIC_LR)) # optimiser func, (actor_lr, critic_lr)
@@ -159,14 +160,12 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
         sample_her_transitions = make_sample_her_transitions('none', 4, her_reward_fun)
 
     buffer_shapes = {
-        'o' : (dummy_env._max_episode_steps, dummy_env.observation_space.spaces['observation'].shape[1]*2),
-        'ag' : (dummy_env._max_episode_steps, dummy_env.observation_space.spaces['achieved_goal'].shape[0]),
-        'g' : (dummy_env._max_episode_steps, dummy_env.observation_space.spaces['desired_goal'].shape[0]),
-        'u' : (dummy_env._max_episode_steps-1, action_space[2].shape[0])
+        'o' : (config['episode_length'], dummy_env.observation_space.spaces['observation'].shape[1]*2),
+        'ag' : (config['episode_length'], dummy_env.observation_space.spaces['achieved_goal'].shape[0]),
+        'g' : (config['episode_length'], dummy_env.observation_space.spaces['desired_goal'].shape[0]),
+        'u' : (config['episode_length']-1, action_space[2].shape[0])
         }
-    memory = ReplayBuffer(buffer_shapes, MEM_SIZE, dummy_env._max_episode_steps, sample_her_transitions)
-
-    config['observation_space'] = dummy_env.observation_space
+    memory = ReplayBuffer(buffer_shapes, MEM_SIZE, config['episode_length'], sample_her_transitions)
 
     experiment_args = (envs, memory, noise, config, normalizer, agent_id)
           
