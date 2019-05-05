@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms.ddpg import DDPG_BD
+from her.algorithms.ddpg_q import DDPG_BD
 from her.algorithms.maddpg import MADDPG_BD
 from her.experience import Normalizer, RunningMean
 from her.exploration import Noise
