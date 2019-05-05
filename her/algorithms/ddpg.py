@@ -86,6 +86,11 @@ class DDPG_BD(object):
             self.backward_optim = optimizer(self.backward.parameters(), lr = critic_lr)
             self.entities.append(self.backward)
             self.entities.append(self.backward_optim)
+
+            self.backward_otw = BackwardDyn(observation_space, action_space[1]).to(device)
+            self.backward_otw_optim = optimizer(self.backward_otw.parameters(), lr = critic_lr)
+            self.entities.append(self.backward_otw)
+            self.entities.append(self.backward_otw_optim)
         else:
             self.backward = backward_dyn
             self.backward.eval()
@@ -272,6 +277,33 @@ class DDPG_BD(object):
         self.backward_optim.step()
 
         return loss_backward.item()
+
+    def update_backward_otw(self, batch, normalizer=None):
+
+        observation_space = self.observation_space - K.tensor(batch['g'], dtype=self.dtype, device=self.device).shape[1]
+        action_space = self.action_space[0].shape[0]
+        
+        s2 = K.cat([K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, observation_space:],
+                    K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+
+        a2 = K.tensor(batch['u'], dtype=self.dtype, device=self.device)[:, action_space:]
+
+        s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
+                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+
+        if normalizer[1] is not None:
+            s2 = normalizer[1].preprocess(s2)
+            s2_ = normalizer[1].preprocess(s2_)
+
+        a2_pred = self.backward_otw(s2, s2_)
+
+        loss_backward_otw = self.loss_func(a2_pred, a2)
+
+        self.backward_otw_optim.zero_grad()
+        loss_backward_otw.backward()
+        self.backward_otw_optim.step()
+
+        return loss_backward_otw.item()
 
     def get_pred_error(self, next_state):
         with K.no_grad():
