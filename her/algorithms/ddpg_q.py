@@ -75,6 +75,12 @@ class DDPG_BD(object):
         self.critics_optim.append(optimizer(self.critics[0].parameters(), lr = critic_lr))
 
         hard_update(self.critics_target[0], self.critics[0])
+
+        self.critics.append(Critic(observation_space, action_space[agent_id]).to(device))
+        self.critics_target.append(Critic(observation_space, action_space[agent_id]).to(device))
+        self.critics_optim.append(optimizer(self.critics[1].parameters(), lr = critic_lr))
+
+        hard_update(self.critics_target[1], self.critics[1])
             
         self.entities.extend(self.critics)
         self.entities.extend(self.critics_target)
@@ -119,7 +125,7 @@ class DDPG_BD(object):
         self.entities.append(self.rnd_model)
         self.entities.append(self.rnd_target)
 
-        print('rnd clipped + r')
+        print('seperaate Qs')
 
     def to_cpu(self):
         for entity in self.entities:
@@ -179,28 +185,14 @@ class DDPG_BD(object):
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
         else:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
-
-            pred_error = self.get_pred_error(s2_)
-            mask = pred_error > self.pred_th
             r_intr = self.get_obj_reward(s2, s2_)
-            if running_rintr_mean is not None:
-                r_intr[mask] =  K.tensor(running_rintr_mean.get_stats(), dtype=s2.dtype, device=s2.device)
-            else:
-                r_intr[mask] = -0.5 
 
-            if self.masked_with_r:
-                r = r_intr * K.abs(r) + r
-            else:
-                r = r_intr + r
-
+        # first critic for main rewards
         Q = self.critics[0](s, a)       
         V = self.critics_target[0](s_, a_).detach()
 
         target_Q = (V * self.gamma) + r
-        if self.object_Qfunc is None:
-            target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
-        else:
-            target_Q = target_Q.clamp(-2/(1.-self.gamma), 0.)
+        target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
 
         loss_critic = self.loss_func(Q, target_Q)
 
@@ -208,9 +200,23 @@ class DDPG_BD(object):
         loss_critic.backward()
         self.critics_optim[0].step()
 
+        # second critic for intrinsic
+        Q = self.critics[1](s, a)       
+        V = self.critics_target[1](s_, a_).detach()
+
+        target_Q = (V * self.gamma) + r_intr
+        target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
+
+        loss_critic = self.loss_func(Q, target_Q)
+
+        self.critics_optim[1].zero_grad()
+        loss_critic.backward()
+        self.critics_optim[1].step()
+
+        # actor update
         a = self.actors[0](s)
 
-        loss_actor = -self.critics[0](s, a).mean()
+        loss_actor = -self.critics[0](s, a).mean() - self.critics[1](s, a).mean()
         
         if self.regularization:
             loss_actor += (self.actors[0](s)**2).mean()*1
@@ -225,6 +231,7 @@ class DDPG_BD(object):
 
         soft_update(self.actors_target[0], self.actors[0], self.tau)
         soft_update(self.critics_target[0], self.critics[0], self.tau)
+        soft_update(self.critics_target[1], self.critics[1], self.tau)
 
     def estimate_obj_action(self, state, next_state):
         with K.no_grad():
