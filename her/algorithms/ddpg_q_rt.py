@@ -149,7 +149,7 @@ class DDPG_BD(object):
 
         return mu
 
-    def update_parameters(self, batch, normalizer=None, running_rintr_mean=None):
+    def update_parameters(self, batch, normalizer=None):
 
         observation_space = self.observation_space - K.tensor(batch['g'], dtype=self.dtype, device=self.device).shape[1]
         action_space = self.action_space[0].shape[0]
