@@ -139,7 +139,7 @@ class DDPG_BD(object):
         self.entities.append(self.rnd_model)
         self.entities.append(self.rnd_target)
 
-        print('seperaate Qs')
+        print('seperaate Qs - RotTrans')
 
     def to_cpu(self):
         for entity in self.entities:
