@@ -81,7 +81,13 @@ class DDPG_BD(object):
         self.critics_optim.append(optimizer(self.critics[1].parameters(), lr = critic_lr))
 
         hard_update(self.critics_target[1], self.critics[1])
-            
+
+        self.critics.append(Critic(observation_space, action_space[agent_id]).to(device))
+        self.critics_target.append(Critic(observation_space, action_space[agent_id]).to(device))
+        self.critics_optim.append(optimizer(self.critics[2].parameters(), lr = critic_lr))
+
+        hard_update(self.critics_target[2], self.critics[2])
+
         self.entities.extend(self.critics)
         self.entities.extend(self.critics_target)
         self.entities.extend(self.critics_optim)
@@ -93,19 +99,27 @@ class DDPG_BD(object):
             self.entities.append(self.backward)
             self.entities.append(self.backward_optim)
         else:
-            self.backward = backward_dyn
-            self.backward.eval()
-            self.entities.append(self.backward)
+            self.backward = []
+            self.backward.append(backward_dyn[0])
+            self.backward.append(backward_dyn[1])
+            self.backward[0].eval()
+            self.backward[1].eval()
+            self.entities.append(self.backward[0])
+            self.entities.append(self.backward[1])
 
         # Learnt Q function for object
         if self.object_Qfunc is not None:
-            self.object_Qfunc.eval()
-            self.entities.append(self.object_Qfunc)
+            self.object_Qfunc[0].eval()
+            self.object_Qfunc[1].eval()
+            self.entities.append(self.object_Qfunc[0])
+            self.entities.append(self.object_Qfunc[1])
 
         # Learnt policy for object
         if self.object_policy is not None:
-            self.object_policy.eval()
-            self.entities.append(self.object_policy)
+            self.object_policy[0].eval()
+            self.object_policy[1].eval()
+            self.entities.append(self.object_policy[0])
+            self.entities.append(self.object_policy[1])
 
         if reward_fun is not None:
             self.get_obj_reward = reward_fun
@@ -161,6 +175,8 @@ class DDPG_BD(object):
                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
         s2 = K.cat([K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, observation_space:],
                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+        s22 = K.cat([K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, observation_space:],
+                            K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
 
         a1 = K.tensor(batch['u'], dtype=self.dtype, device=self.device)[:, 0:action_space]
         a2 = K.tensor(batch['u'], dtype=self.dtype, device=self.device)[:, action_space:]
@@ -169,7 +185,8 @@ class DDPG_BD(object):
                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
         s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
                      K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
-        
+        s22_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
+                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)   
         if normalizer[0] is not None:
             s1 = normalizer[0].preprocess(s1)
             s1_ = normalizer[0].preprocess(s1_)
@@ -178,6 +195,10 @@ class DDPG_BD(object):
             s2 = normalizer[1].preprocess(s2)
             s2_ = normalizer[1].preprocess(s2_)
 
+        if normalizer[2] is not None:
+            s22 = normalizer[2].preprocess(s22)
+            s22_ = normalizer[2].preprocess(s22_)
+
         s, s_, a = (s1, s1_, a1) if self.agent_id == 0 else (s2, s2_, a2)
         a_ = self.actors_target[0](s_)
 
@@ -185,7 +206,8 @@ class DDPG_BD(object):
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
         else:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
-            r_intr = self.get_obj_reward(s2, s2_)
+            r_intr_0 = self.get_obj_reward(s2, s2_, 0)
+            r_intr_1 = self.get_obj_reward(s22, s22_, 1)
 
         # first critic for main rewards
         Q = self.critics[0](s, a)       
@@ -204,7 +226,7 @@ class DDPG_BD(object):
         Q = self.critics[1](s, a)       
         V = self.critics_target[1](s_, a_).detach()
 
-        target_Q = (V * self.gamma) + r_intr
+        target_Q = (V * self.gamma) + r_intr_0
         target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
 
         loss_critic = self.loss_func(Q, target_Q)
@@ -213,10 +235,23 @@ class DDPG_BD(object):
         loss_critic.backward()
         self.critics_optim[1].step()
 
+        # third critic for intrinsic
+        Q = self.critics[2](s, a)       
+        V = self.critics_target[2](s_, a_).detach()
+
+        target_Q = (V * self.gamma) + r_intr_1
+        target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
+
+        loss_critic = self.loss_func(Q, target_Q)
+
+        self.critics_optim[2].zero_grad()
+        loss_critic.backward()
+        self.critics_optim[2].step()
+
         # actor update
         a = self.actors[0](s)
 
-        loss_actor = -self.critics[0](s, a).mean() - self.critics[1](s, a).mean()
+        loss_actor = -self.critics[0](s, a).mean() - self.critics[1](s, a).mean() - self.critics[2](s, a).mean()
         
         if self.regularization:
             loss_actor += (self.actors[0](s)**2).mean()*1
@@ -232,6 +267,7 @@ class DDPG_BD(object):
         soft_update(self.actors_target[0], self.actors[0], self.tau)
         soft_update(self.critics_target[0], self.critics[0], self.tau)
         soft_update(self.critics_target[1], self.critics[1], self.tau)
+        soft_update(self.critics_target[2], self.critics[2], self.tau)
 
     def estimate_obj_action(self, state, next_state):
         with K.no_grad():
@@ -245,12 +281,12 @@ class DDPG_BD(object):
 
         return action
 
-    def reward_fun(self, state, next_state):
+    def reward_fun(self, state, next_state, index):
         with K.no_grad():
-            action = self.backward(state.to(self.device), next_state.to(self.device))
-            opt_action = self.object_policy(state.to(self.device))
+            action = self.backward[index](state.to(self.device), next_state.to(self.device))
+            opt_action = self.object_policy[index](state.to(self.device))
 
-            reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
+            reward = self.object_Qfunc[index](state.to(self.device), action) - self.object_Qfunc[index](state.to(self.device), opt_action)
         return reward.clamp(min=-1.0, max=0.0)
 
     def update_backward(self, batch, normalizer=None):
