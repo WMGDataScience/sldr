@@ -22,7 +22,7 @@ def hard_update(target, source):
 class DDPG_BD(object):
     def __init__(self, observation_space, action_space, optimizer, Actor, Critic, loss_func, gamma, tau, out_func=K.sigmoid,
                  discrete=True, regularization=False, normalized_rewards=False, agent_id=0, object_Qfunc=None, backward_dyn=None, 
-                 object_policy=None, reward_fun=None, masked_with_r=False, rnd_models=None, pred_th=0.0002,
+                 object_policy=None, reward_fun=None,
                  dtype=K.float32, device="cuda"):
 
         super(DDPG_BD, self).__init__()
@@ -44,8 +44,6 @@ class DDPG_BD(object):
         self.agent_id = agent_id
         self.object_Qfunc = object_Qfunc
         self.object_policy = object_policy
-        self.masked_with_r = masked_with_r
-        self.pred_th = pred_th
 
         # model initialization
         self.entities = []
@@ -112,19 +110,6 @@ class DDPG_BD(object):
         else:
             self.get_obj_reward = self.reward_fun
 
-        if rnd_models is None:
-            self.rnd_model = RandomNetDist(observation_space).to(device)
-            self.rnd_target = RandomNetDist(observation_space).to(device)
-            self.rnd_optim = optimizer(self.rnd_model.parameters(), lr = critic_lr)
-
-            self.entities.append(self.rnd_optim)
-        else:
-            self.rnd_model = rnd_models[0]
-            self.rnd_target = rnd_models[1]
-
-        self.entities.append(self.rnd_model)
-        self.entities.append(self.rnd_target)
-
         print('seperaate Qs')
 
     def to_cpu(self):
@@ -150,7 +135,7 @@ class DDPG_BD(object):
 
         return mu
 
-    def update_parameters(self, batch, normalizer=None, running_rintr_mean=None):
+    def update_parameters(self, batch, normalizer=None):
 
         observation_space = self.observation_space - K.tensor(batch['g'], dtype=self.dtype, device=self.device).shape[1]
         action_space = self.action_space[0].shape[0]
@@ -233,18 +218,6 @@ class DDPG_BD(object):
         soft_update(self.critics_target[0], self.critics[0], self.tau)
         soft_update(self.critics_target[1], self.critics[1], self.tau)
 
-    def estimate_obj_action(self, state, next_state):
-        with K.no_grad():
-            action = self.backward(state.to(self.device), next_state.to(self.device))
-
-        return action
-
-    def get_obj_action(self, state):
-        with K.no_grad():
-            action = self.object_policy(state.to(self.device))
-
-        return action
-
     def reward_fun(self, state, next_state):
         with K.no_grad():
             action = self.backward(state.to(self.device), next_state.to(self.device))
@@ -253,60 +226,4 @@ class DDPG_BD(object):
             reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
         return reward.clamp(min=-1.0, max=0.0)
 
-    def update_backward(self, batch, normalizer=None):
 
-        observation_space = self.observation_space - K.tensor(batch['g'], dtype=self.dtype, device=self.device).shape[1]
-        action_space = self.action_space[0].shape[0]
-        
-        s2 = K.cat([K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, observation_space:],
-                    K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
-
-        a2 = K.tensor(batch['u'], dtype=self.dtype, device=self.device)[:, action_space:]
-
-        s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
-                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
-
-        if normalizer[1] is not None:
-            s2 = normalizer[1].preprocess(s2)
-            s2_ = normalizer[1].preprocess(s2_)
-
-        a2_pred = self.backward(s2, s2_)
-
-        loss_backward = self.loss_func(a2_pred, a2)
-
-        self.backward_optim.zero_grad()
-        loss_backward.backward()
-        self.backward_optim.step()
-
-        return loss_backward.item()
-
-    def get_pred_error(self, next_state):
-        with K.no_grad():
-            target = self.rnd_target(next_state)
-            pred = self.rnd_model(next_state)
-            
-        error = F.mse_loss(pred, target, reduction='none').mean(1)
-
-        return error
-
-    def update_coverage(self, batch, normalizer=None):
-        observation_space = self.observation_space - K.tensor(batch['g'], dtype=self.dtype, device=self.device).shape[1]
-
-        s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
-                K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
-
-        if normalizer[1] is not None:
-            s2_ = normalizer[1].preprocess(s2_)
-
-        rnd_pred = self.rnd_model(s2_)
-        
-        with K.no_grad():
-            rnd_targ = self.rnd_target(s2_)
-
-        loss_rnd = self.loss_func(rnd_pred, rnd_targ.detach())
-
-        self.rnd_optim.zero_grad()
-        loss_rnd.backward()
-        self.rnd_optim.step()
-
-        return loss_rnd.item()
