@@ -116,7 +116,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                   Actor, Critic, loss_func, GAMMA, TAU, out_func=OUT_FUNC, discrete=False, 
                   regularization=REGULARIZATION, normalized_rewards=NORMALIZED_REWARDS,
                   agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
-                  object_policy=object_policy, reward_fun=reward_fun, masked_with_r=config['masked_with_r'], 
+                  object_policy=object_policy, reward_fun=reward_fun, 
                   n_objects=config['max_nb_objects'])
     normalizer = [Normalizer(), Normalizer()]
 
@@ -250,10 +250,7 @@ def rollout(env, model, noise, config, normalizer=None, render=False,):
                 for i_object in range(model.n_objects):
                     r_intr += model.get_obj_reward(obs_goal[1][:,:,i_object], next_obs_goal[1][:,:,i_object])
                 
-            if model.masked_with_r:
-                episode_reward += (r_intr * K.abs(reward) + reward).squeeze(1).cpu().numpy()
-            else:
-                episode_reward += (r_intr + reward).squeeze(1).cpu().numpy()
+            episode_reward += (r_intr + reward).squeeze(1).cpu().numpy()
 
         for i_agent in range(2):
             state = {
@@ -305,13 +302,11 @@ def run(model, experiment_args, train=True):
 
     total_time_start =  time.time()
 
-    env, memory, noise, config, normalizer, agent_id = experiment_args
+    env, memory, noise, config, normalizer, _ = experiment_args
     
     N_EPISODES = config['n_episodes'] if train else config['n_episodes_test']
     N_CYCLES = config['n_cycles']
-    N_ROLLOUTS = config['n_rollouts']
     N_BATCHES = config['n_batches']
-    N_BD_BATCHES = config['n_bd_batches']
     N_TEST_ROLLOUTS = config['n_test_rollouts']
     BATCH_SIZE = config['batch_size']
     
