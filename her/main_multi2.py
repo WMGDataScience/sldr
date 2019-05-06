@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms.ddpg_multi import DDPG_BD
+from her.algorithms.ddpg_multi_q import DDPG_BD
 from her.algorithms.maddpg import MADDPG_BD
 from her.experience import Normalizer
 from her.exploration import Noise
@@ -205,12 +205,12 @@ def rollout(env, model, noise, config, normalizer=None, render=False,):
         if model.n_objects <= 1:
             obs_goal.append(K.cat([obs[1], goal], dim=-1))            
             if normalizer[1] is not None:
-                obs_goal[1] = normalizer[1].preprocess_with_update(obs_goal[1])
+                obs_goal[1] = normalizer[1].preprocess(obs_goal[1])
         else:
             obs_goal.append(get_obj_obs(obs[1], goal, model.n_objects))
             if normalizer[1] is not None:
                 for i_object in range(model.n_objects):
-                    obs_goal[1][:,:,i_object] = normalizer[1].preprocess_with_update(obs_goal[1][:,:,i_object])
+                    obs_goal[1][:,:,i_object] = normalizer[1].preprocess(obs_goal[1][:,:,i_object])
 
         action = model.select_action(obs_goal[0], noise).cpu().numpy()
 
