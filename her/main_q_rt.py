@@ -297,13 +297,11 @@ def run(model, experiment_args, train=True):
 
     total_time_start =  time.time()
 
-    env, memory, noise, config, normalizer, running_rintr_mean = experiment_args
+    env, memory, noise, config, normalizer, _ = experiment_args
     
     N_EPISODES = config['n_episodes'] if train else config['n_episodes_test']
     N_CYCLES = config['n_cycles']
-    N_ROLLOUTS = config['n_rollouts']
     N_BATCHES = config['n_batches']
-    N_BD_BATCHES = config['n_bd_batches']
     N_TEST_ROLLOUTS = config['n_test_rollouts']
     BATCH_SIZE = config['batch_size']
     
