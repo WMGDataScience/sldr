@@ -14,7 +14,7 @@ from her.algorithms.ddpg_fine import DDPG_BD
 from her.algorithms.maddpg import MADDPG_BD
 from her.experience import Normalizer
 from her.exploration import Noise
-from her.utils import Saver, Summarizer, get_params, running_mean
+from her.utils import Saver, Summarizer, get_params, running_mean, get_obj_obs
 from her.agents.basic import Actor 
 from her.agents.basic import Critic
 
@@ -86,12 +86,12 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
 
     #exploration initialization
     noise = (Noise(action_space[0].shape[0], sigma=0.2, eps=0.3),
-             Noise(action_space[1].shape[0], sigma=0.2, eps=0.3)
+             Noise(action_space[1].shape[0]//config['max_nb_objects'], sigma=0.2, eps=0.3)
             )
 
     if agent == 'robot':
         agent_id = 0
-        env[0]._max_episode_steps *= config['max_nb_objects']
+        #env[0]._max_episode_steps *= config['max_nb_objects']
     elif agent == 'object':
         agent_id = 1
 
@@ -102,7 +102,8 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                   Actor, Critic, loss_func, GAMMA, TAU, out_func=OUT_FUNC, discrete=False, 
                   regularization=REGULARIZATION, normalized_rewards=NORMALIZED_REWARDS,
                   agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
-                  object_policy=object_policy, reward_fun=reward_fun, masked_with_r=config['masked_with_r'])
+                  object_policy=object_policy, reward_fun=reward_fun, masked_with_r=config['masked_with_r'],
+                  n_objects=config['max_nb_objects'])
     normalizer = [Normalizer(), Normalizer()]
 
     #memory initilization  
@@ -178,17 +179,32 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False, agent_id=0,
 
         # Observation normalization
         obs_goal = []
-        for i_agent in range(2):
-            obs_goal.append(K.cat([obs[i_agent], goal], dim=-1))
-            if normalizer[i_agent] is not None:
-                obs_goal[i_agent] = normalizer[i_agent].preprocess_with_update(obs_goal[i_agent])
+        obs_goal.append(K.cat([obs[0], goal], dim=-1))            
+        if normalizer[0] is not None:
+            obs_goal[0] = normalizer[0].preprocess_with_update(obs_goal[0])
+
+        if model.n_objects <= 1:
+            obs_goal.append(K.cat([obs[1], goal], dim=-1))            
+            if normalizer[1] is not None:
+                obs_goal[1] = normalizer[1].preprocess_with_update(obs_goal[1])
+        else:
+            obs_goal.append(get_obj_obs(obs[1], goal, model.n_objects))
+            if normalizer[1] is not None:
+                for i_object in range(model.n_objects):
+                    obs_goal[1][:,:,i_object] = normalizer[1].preprocess_with_update(obs_goal[1][:,:,i_object])
 
         action = model.select_action(obs_goal[agent_id], noise[agent_id]).cpu().numpy().squeeze(0)
 
         if agent_id == 0:
             if ai_object:
                 action_to_env = env[0].action_space.sample() * rob_policy[0] + np.ones_like(env[0].action_space.sample()) * rob_policy[1]
-                action_to_env[action.shape[0]::] = model.get_obj_action(obs_goal[1], noise[1]).cpu().numpy().squeeze(0)
+                if model.n_objects <= 1:
+                    action_to_env[action.shape[0]::] = model.get_obj_action(obs_goal[1], noise[1]).cpu().numpy().squeeze(0)
+                else:
+                    n_obj_actions = len(action_to_env[action.shape[0]::])//model.n_objects
+                    for i_object in range(model.n_objects):
+                        act_slice=slice(action.shape[0]+i_object*n_obj_actions, action.shape[0]+(i_object+1)*n_obj_actions)
+                        action_to_env[act_slice] = model.get_obj_action(obs_goal[1][:,:,i_object], noise[1]).cpu().numpy().squeeze(0)
             else:
                 action_to_env = np.zeros_like(env[0].action_space.sample())
                 action_to_env[0:action.shape[0]] = action
@@ -203,19 +219,38 @@ def rollout(env, model, noise, i_env, normalizer=None, render=False, agent_id=0,
         
         # Observation normalization
         next_obs_goal = []
-        for i_agent in range(2):
-            next_obs_goal.append(K.cat([next_obs[i_agent], goal], dim=-1))
-            if normalizer[i_agent] is not None:
-                next_obs_goal[i_agent] = normalizer[i_agent].preprocess(next_obs_goal[i_agent])
+        next_obs_goal.append(K.cat([next_obs[0], goal], dim=-1))
+        if normalizer[0] is not None:
+            next_obs_goal[0] = normalizer[0].preprocess(next_obs_goal[0])
+
+        if model.n_objects <= 1:
+            next_obs_goal.append(K.cat([next_obs[1], goal], dim=-1))
+            if normalizer[1] is not None:
+                next_obs_goal[1] = normalizer[1].preprocess(next_obs_goal[1])
+        else:
+            next_obs_goal.append(get_obj_obs(next_obs[1], goal, model.n_objects))
+            if normalizer[1] is not None:
+                for i_object in range(model.n_objects):
+                    next_obs_goal[1][:,:,i_object] = normalizer[1].preprocess(next_obs_goal[1][:,:,i_object])
 
         # for monitoring
         if model.object_Qfunc is None:            
             episode_reward += reward
         else:
-            if model.masked_with_r:
-                episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) * K.abs(reward) + reward)
+            if model.n_objects <= 1:
+                if model.masked_with_r:
+                    episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) * K.abs(reward) + reward)
+                else:
+                    episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) + reward)
             else:
-                episode_reward += (model.get_obj_reward(obs_goal[1], next_obs_goal[1]) + reward)
+                intrinsic_reward = K.zeros_like(reward)
+                for i_object in range(model.n_objects):
+                    intrinsic_reward += model.get_obj_reward(obs_goal[1][:,:,i_object], next_obs_goal[1][:,:,i_object])
+                
+                if model.masked_with_r:
+                    episode_reward += (intrinsic_reward * K.abs(reward) + reward)
+                else:
+                    episode_reward += (intrinsic_reward + reward)              
 
         for i_agent in range(2):
             state = {
@@ -296,7 +331,7 @@ def run(model, experiment_args, train=True):
                     i_env = i_rollout % config['n_envs']
                     render = config['render'] > 0 and i_rollout==0
                     trajectories, _, _, _ = rollout(env, model, noise, i_env, normalizer, render=render, agent_id=agent_id, ai_object=ai_object, rob_policy=config['rob_policy'])
-                    memory[0].store_episode(trajectories.copy())   
+                    memory[agent_id].store_episode(trajectories.copy())   
               
                 for i_batch in range(N_BATCHES):  
                     model.to_cuda()
@@ -323,13 +358,13 @@ def run(model, experiment_args, train=True):
                         trajectories, _, _, _ = rollout(env, model, noise, i_env, normalizer, render=render, agent_id=agent_id, ai_object=True, rob_policy=config['rob_policy'])
                         memory[1].store_episode(trajectories.copy())
                         
-                    for i_batch in range(N_BATCHES):  
-                        model.to_cuda()
-                        batch = memory[1].sample(BATCH_SIZE)
-                        _, _ = model.update_object_parameters(batch, normalizer)
+                    #for i_batch in range(N_BATCHES):  
+                    #    model.to_cuda()
+                    #    batch = memory[1].sample(BATCH_SIZE)
+                    #    _, _ = model.update_object_parameters(batch, normalizer)
 
-                    model.update_object_target()
-
+                    #model.update_object_target()
+                    model.to_cuda()
                     for i_batch in range(N_BD_BATCHES):
                         batch = memory[1].sample(BATCH_SIZE)
                         _ = model.update_backward(batch, normalizer)  
