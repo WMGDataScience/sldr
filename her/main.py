@@ -61,14 +61,14 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                                     obj_range=config['obj_range'])
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(N_ENVS)])
         n_rob_actions = 4
-        #n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
-        n_actions = config['max_nb_objects'] * 3 + n_rob_actions
+        n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
+        #n_actions = config['max_nb_objects'] * 3 + n_rob_actions
     elif 'HandManipulate' in ENV_NAME and 'Multi' in ENV_NAME:
         dummy_env = gym.make(ENV_NAME, obj_action_type=config['obj_action_type'])
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Hand', agent == 'object') for i_env in range(N_ENVS)])
         n_rob_actions = 20
-        #n_actions = 1 * len(config['obj_action_type']) + n_rob_actions
-        n_actions = 1 * 4 + n_rob_actions
+        n_actions = 1 * len(config['obj_action_type']) + n_rob_actions
+        #n_actions = 1 * 4 + n_rob_actions
     else:
         dummy_env = gym.make(ENV_NAME)
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Others', agent == 'object') for i_env in range(N_ENVS)])
@@ -111,7 +111,8 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
         noise = Noise(action_space[0].shape[0], sigma=0.2, eps=0.3)
     elif agent == 'object':
         agent_id = 1
-        noise = Noise(action_space[1].shape[0], sigma=0.2, eps=0.3)    
+        #noise = Noise(action_space[1].shape[0], sigma=0.2, eps=0.3)    
+        noise = Noise(action_space[1].shape[0], sigma=0.05, eps=0.2)   
     config['episode_length'] = dummy_env._max_episode_steps
     config['observation_space'] = dummy_env.observation_space
 
@@ -325,6 +326,7 @@ def run(model, experiment_args, train=True):
     critic_losses = []
     actor_losses = []
     backward_losses = []
+    backward_otw_losses = []
     rnd_losses = []
         
     for i_episode in range(N_EPISODES):
@@ -351,9 +353,9 @@ def run(model, experiment_args, train=True):
                 if agent_id == 1:
                     for i_batch in range(N_BATCHES):
                         batch = memory.sample(BATCH_SIZE)
-                        backward_loss = model.update_backward(batch, normalizer)  
+                        backward_otw_loss = model.update_backward_otw(batch, normalizer)  
                         if i_batch == N_BATCHES - 1:
-                            backward_losses.append(backward_loss)
+                            backward_otw_losses.append(backward_otw_loss)
 
             # <-- end loop: i_cycle
         plot_durations(np.asarray(critic_losses), np.asarray(actor_losses))
@@ -394,14 +396,15 @@ def run(model, experiment_args, train=True):
 
     if train and agent_id==1:
         print('Training Backward Model')
-        # model.to_cuda()
-        # for _ in range(N_EPISODES*N_CYCLES):
-        #     for i_batch in range(N_BD_BATCHES):
-        #         batch = memory.sample(BATCH_SIZE)
-        #         backward_loss = model.update_backward(batch, normalizer)  
-        #         if i_batch == N_BD_BATCHES - 1:
-        #             backward_losses.append(backward_loss)
-        plot_durations(np.asarray(backward_losses), np.asarray(backward_losses))
+        model.to_cuda()
+        for _ in range(N_EPISODES*N_CYCLES):
+            for i_batch in range(N_BATCHES):
+                batch = memory.sample(BATCH_SIZE)
+                backward_loss = model.update_backward(batch, normalizer)  
+                if i_batch == N_BATCHES - 1:
+                    backward_losses.append(backward_loss)
+
+        plot_durations(np.asarray(backward_otw_losses), np.asarray(backward_losses))
 
         # print('Training RND')
         # for _ in range(N_EPISODES*N_CYCLES):
