@@ -6,17 +6,15 @@ import torch as K
 
 from her.utils import get_params as get_params, running_mean, get_exp_params
 from her.main import init, run
-from her.main_ppo import init as init_ppo
-from her.main_ppo import run as run_ppo
-from her.main_rnd import init as init_rnd
-from her.main_rnd import run as run_rnd
+from her.main_q import init as init_q
+from her.main_q import run as run_q
 import matplotlib.pyplot as plt
 
 import os
 import pickle
 import sys
 
-K.set_num_threads(2)
+K.set_num_threads(1)
 
 filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
 os.chdir(filepath)
@@ -30,15 +28,9 @@ if exp_config['env'] == 'Push':
     env_name = 'FetchPushMulti-v1'
 elif exp_config['env'] == 'PnP':
     env_name = 'FetchPickAndPlaceMulti-v1'
+elif exp_config['env'] == 'Slide':
+    env_name = 'FetchSlideMulti-v1'
 
-if exp_config['multiseed'] == 'True':
-    multiseed = True
-    n_envs = 38
-elif exp_config['multiseed'] == 'False':
-    multiseed = False
-    n_envs = 1
-
-masked_with_r = exp_config['masked_with_r']
 if exp_config['use_her'] == 'True':
     use_her = True
 else:
@@ -60,10 +52,9 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
                 '--n_cycles', '50',
                 '--n_rollouts', '38',
                 '--n_test_rollouts', '38',
-                '--n_envs', str(n_envs),
+                '--n_envs', '38',
                 '--n_batches', '40',
-                '--batch_size', '256',
-                '--n_bd_batches', '400',
+                '--batch_size', '4864',
                 '--obj_action_type', '0123456',
                 '--max_nb_objects', '1',
                 '--observe_obj_grp', 'False',
@@ -79,15 +70,15 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
 
         #loading the object model
         if exp_config['env'] == 'Push':
-            path = './models/obj/obj_pnp_xyzrpy_rnd/'
+            path = './models_paper/obj/obj_push_7d_20ep/'
         elif exp_config['env'] == 'PnP':
-            path = './models/obj/obj_pnp_xyzrpy_rnd/'
+            path = './models_paper/obj/obj_pnp_7d_20ep/'
+        elif exp_config['env'] == 'Slide':
+            path = './models_paper/obj/obj_slide_7d_20ep/'
 
         model.critics[0].load_state_dict(K.load(path + 'object_Qfunc.pt'))
-        model.backward.load_state_dict(K.load(path + 'backward_dyn.pt'))
         model.actors[0].load_state_dict(K.load(path + 'object_policy.pt'))
-        model.rnd_model.load_state_dict(K.load(path + 'rnd_model.pt'))
-        model.rnd_target.load_state_dict(K.load(path + 'rnd_target.pt'))
+        model.backward.load_state_dict(K.load(path + 'backward_dyn.pt'))
         with open(path + 'normalizer.pkl', 'rb') as file:
             normalizer = pickle.load(file)
 
@@ -95,132 +86,64 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         
         obj_rew = True
         object_Qfunc = model.critics[0]
-        backward_dyn = model.backward
         object_policy = model.actors[0]  
-        rnd_model = model.rnd_model
-        rnd_target = model.rnd_target
+        backward_dyn = model.backward
     ####################### loading object ###########################
     elif exp_config['obj_rew'] == 'False':
         obj_rew = False
         object_Qfunc = None
-        backward_dyn = None
         object_policy = None  
-        rnd_model = None
-        rnd_target = None
+        backward_dyn = None
 
     ####################### training robot ###########################  
-    if exp_config['rob_model'] == 'DDPG':
-        model_name = 'DDPG_BD'
-        exp_args2=['--env_id', env_name,
-                '--exp_id', model_name + '_foorob_' + str(i_exp),
-                '--random_seed', str(i_exp), 
-                '--agent_alg', model_name,
-                '--verbose', '2',
-                '--render', '0',
-                '--gamma', '0.98',
-                '--n_episodes', '50',
-                '--n_cycles', '50',
-                '--n_rollouts', '38',
-                '--n_test_rollouts', '380',
-                '--n_envs', str(n_envs),
-                '--n_batches', '40',
-                '--batch_size', '256',
-                '--n_bd_batches', '400',
-                '--obj_action_type', '0123456',
-                '--max_nb_objects', '1',
-                '--observe_obj_grp', 'False',
-                '--masked_with_r', masked_with_r,
-                '--pred_th', str(exp_config['pred_th'])
-                ]
+    model_name = 'DDPG_BD'
+    exp_args2=['--env_id', env_name,
+            '--exp_id', model_name + '_foorob_' + str(i_exp),
+            '--random_seed', str(i_exp), 
+            '--agent_alg', model_name,
+            '--verbose', '2',
+            '--render', '0',
+            '--gamma', '0.98',
+            '--n_episodes', '50',
+            '--n_cycles', '50',
+            '--n_rollouts', '38',
+            '--n_test_rollouts', '380',
+            '--n_envs', '38',
+            '--n_batches', '40',
+            '--batch_size', '4864',
+            '--obj_action_type', '0123456',
+            '--max_nb_objects', '1',
+            '--observe_obj_grp', 'False',
+            ]
 
-        config2 = get_params(args=exp_args2)
-        model2, experiment_args2 = init_rnd(config2, agent='robot', her=use_her, 
-                                        object_Qfunc=object_Qfunc, 
-                                        backward_dyn=backward_dyn,
-                                        object_policy=object_policy,
-                                        rnd_models=(rnd_model, rnd_target)
-                                    )
-        env2, memory2, noise2, config2, normalizer2, running_rintr_mean2 = experiment_args2
-        if obj_rew:
-            normalizer2[1] = normalizer[1]
-        experiment_args2 = (env2, memory2, noise2, config2, normalizer2, running_rintr_mean2)
-
-        monitor2 = run_rnd(model2, experiment_args2, train=True)
-
-    elif exp_config['rob_model'] == 'PPO':
-        model_name = 'PPO_BD'
-        exp_args2=['--env_id', env_name,
-                '--exp_id', model_name + '_foorob_' + str(i_exp),
-                '--random_seed', str(i_exp), 
-                '--agent_alg', model_name,
-                '--verbose', '2',
-                '--render', '0',
-                '--gamma', '0.98',
-                '--n_episodes', '50',
-                '--n_cycles', '50',
-                '--n_rollouts', '38',
-                '--n_test_rollouts', '380',
-                '--n_envs', str(n_envs),
-                '--n_batches', '4',
-                '--batch_size', '256',
-                '--obj_action_type', '0123456',
-                '--max_nb_objects', '1',
-                '--observe_obj_grp', 'False',
-                '--masked_with_r', masked_with_r,
-                '--pred_th', str(exp_config['pred_th']),
-                '--plcy_lr', '3e-4',
-                '--crtc_lr', '3e-4',
-                '--ppo_epoch', '3',
-                '--entropy_coef', '0.00',
-                '--clip_param', '0.1',
-                '--use_gae', "True",
-        ]
-
-        config2 = get_params(args=exp_args2)
-        model2, experiment_args2 = init_ppo(config2, agent='robot', her=False, 
-                                        object_Qfunc=object_Qfunc, 
-                                        backward_dyn=backward_dyn,
-                                        object_policy=object_policy,
-                                        rnd_models=(rnd_model, rnd_target)
-                                    )
-        env2, memory2, noise2, config2, normalizer2, running_rintr_mean2 = experiment_args2
+    config2 = get_params(args=exp_args2)
+    model2, experiment_args2 = init_q(config2, agent='robot', her=use_her, 
+                                    object_Qfunc=object_Qfunc, 
+                                    object_policy=object_policy,
+                                    backward_dyn=backward_dyn,
+                                )
+    env2, memory2, noise2, config2, normalizer2, running_rintr_mean2 = experiment_args2
+    if obj_rew:
         normalizer2[1] = normalizer[1]
-        experiment_args2 = (env2, memory2, noise2, config2, normalizer2, running_rintr_mean2)
+    experiment_args2 = (env2, memory2, noise2, config2, normalizer2, running_rintr_mean2)
 
-        monitor2 = run_ppo(model2, experiment_args2, train=True)
+    monitor2 = run_q(model2, experiment_args2, train=True)
 
     rob_name = exp_config['env']
-    if exp_config['rob_model'] == 'PPO':
-        if obj_rew:
-            rob_name = rob_name + '_v4_PPO_'
-        else:
-            rob_name = rob_name + '_PPO_'
-    elif exp_config['rob_model'] == 'DDPG':
+    if exp_config['rob_model'] == 'DDPG':
         if obj_rew:
             if use_her:
-                rob_name = rob_name + '_v4_HER_'
+                rob_name = rob_name + '_DDPG_OURS_HER_'
             else:
-                rob_name = rob_name + '_v4_DDPG_'
+                rob_name = rob_name + '_DDPG_OURS_'
         else:
             if use_her:
-                rob_name = rob_name + '_HER_'
+                rob_name = rob_name + '_DDPG_HER_'
             else:
                 rob_name = rob_name + '_DDPG_'
 
-    rob_name = rob_name + 'Norm_Slide_Clipped_Both_'
-    if masked_with_r:
-        rob_name = rob_name + 'Masked_PlusR'
-    else:
-        rob_name = rob_name + 'PlusR'
 
-    if multiseed:
-        rob_name = rob_name + '_Multiseed'
-    else:
-        rob_name = rob_name + '_Singleseed'
-
-    rob_name = rob_name + str(exp_config['pred_th'])
-
-    path = './models/_recent/rob_model_' + rob_name + '_' + str(i_exp)
+    path = './models_paper/batch/' + rob_name + '_' + str(i_exp)
     try:  
         os.makedirs(path)
     except OSError:  
@@ -238,6 +161,6 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
     with open(path + '/normalizer.pkl', 'wb') as file:
         pickle.dump(normalizer2, file)
 
-    path = './monitors/_recent/monitor_' + rob_name  + '_' + str(i_exp) + '.npy'
+    path = './monitors_paper/batch/monitor_' + rob_name  + '_' + str(i_exp) + '.npy'
     np.save(path, monitor2)
 
