@@ -142,17 +142,16 @@ for env_name in ['FetchPushMulti-v1', 'FetchPickAndPlaceMulti-v1', 'FetchSlideMu
         monitor2 = run_2(model2, experiment_args2, train=True)
 
         rob_name = exp_config['env']
-        if exp_config['rob_model'] == 'DDPG':
-            if obj_rew:
-                if use_her:
-                    rob_name = rob_name + '_DDPG_OURS_HER_'
-                else:
-                    rob_name = rob_name + '_DDPG_OURS_'
+        if obj_rew:
+            if use_her:
+                rob_name = rob_name + '_DDPG_OURS_HER_'
             else:
-                if use_her:
-                    rob_name = rob_name + '_DDPG_HER_'
-                else:
-                    rob_name = rob_name + '_DDPG_'
+                rob_name = rob_name + '_DDPG_OURS_'
+        else:
+            if use_her:
+                rob_name = rob_name + '_DDPG_HER_'
+            else:
+                rob_name = rob_name + '_DDPG_'
 
 
         path = './models_paper/batch/' + rob_name + '_' + str(i_exp)
