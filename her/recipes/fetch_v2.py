@@ -88,12 +88,16 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         object_Qfunc = model.critics[0]
         object_policy = model.actors[0]  
         backward_dyn = model.backward
+        init_2 = init_q   
+        run_2 = run_q
     ####################### loading object ###########################
     elif exp_config['obj_rew'] == 'False':
         obj_rew = False
         object_Qfunc = None
         object_policy = None  
         backward_dyn = None
+        init_2 = init
+        run_2 = run
 
     ####################### training robot ###########################  
     model_name = 'DDPG_BD'
@@ -117,7 +121,7 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
             ]
 
     config2 = get_params(args=exp_args2)
-    model2, experiment_args2 = init_q(config2, agent='robot', her=use_her, 
+    model2, experiment_args2 = init_2(config2, agent='robot', her=use_her, 
                                     object_Qfunc=object_Qfunc, 
                                     object_policy=object_policy,
                                     backward_dyn=backward_dyn,
@@ -127,7 +131,7 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         normalizer2[1] = normalizer[1]
     experiment_args2 = (env2, memory2, noise2, config2, normalizer2, running_rintr_mean2)
 
-    monitor2 = run_q(model2, experiment_args2, train=True)
+    monitor2 = run_2(model2, experiment_args2, train=True)
 
     rob_name = exp_config['env']
     if exp_config['rob_model'] == 'DDPG':
