@@ -31,7 +31,7 @@ exp_config = get_exp_params(sys.argv[1:])
 # elif exp_config['env'] == 'Slide':
 #     env_name = 'FetchSlideMulti-v1'
 
-for env_name in ['FetchPushMulti-v1', 'FetchPickAndPlaceMulti-v1', 'FetchSlideMulti-v1']:
+for env_name in ['HandManipulateEggRotateMulti-v0', 'HandManipulateBlockRotateXYZMulti-v0']:
 
     if exp_config['use_her'] == 'True':
         use_her = True
@@ -51,8 +51,8 @@ for env_name in ['FetchPushMulti-v1', 'FetchPickAndPlaceMulti-v1', 'FetchSlideMu
                     '--agent_alg', model_name,
                     '--verbose', '2',
                     '--render', '0',
-                    '--gamma', '0.98',
-                    '--n_episodes', '20',
+                    '--gamma', '0.99',
+                    '--n_episodes', '50',
                     '--n_cycles', '50',
                     '--n_rollouts', '38',
                     '--n_test_rollouts', '38',
@@ -62,8 +62,7 @@ for env_name in ['FetchPushMulti-v1', 'FetchPickAndPlaceMulti-v1', 'FetchSlideMu
                     '--obj_action_type', '0123456',
                     '--max_nb_objects', '1',
                     '--observe_obj_grp', 'False',
-                    '--rob_policy', '02',
-                    ]
+                    '--rob_policy', '01']
 
             config = get_params(args=exp_args)
             model, experiment_args = init(config, agent='object', her=True, 
@@ -73,12 +72,12 @@ for env_name in ['FetchPushMulti-v1', 'FetchPickAndPlaceMulti-v1', 'FetchSlideMu
             env, memory, noise, config, normalizer, agent_id = experiment_args
 
             #loading the object model
-            if env_name == 'FetchPushMulti-v1':
-                path = './models_paper/obj/obj_push_7d_20ep/'
-            elif env_name == 'FetchPickAndPlaceMulti-v1':
-                path = './models_paper/obj/obj_pnp_7d_20ep/'
-            elif env_name == 'FetchSlideMulti-v1':
-                path = './models_paper/obj/obj_slide_7d_20ep/'
+            if env_name == 'HandManipulateEggRotateMulti-v0':
+                path = './models_paper/obj/egg_rotate_7d_50ep/'
+            elif env_name == 'HandManipulateBlockRotateXYZMulti-v0':
+                path = './models_paper/obj/block_rotate_7d_50ep/'
+            elif env_name == 'HandManipulatePenRotateMulti-v0':
+                path = './models_paper/obj/pen_rotate_7d_50ep/'
 
             print('loading object model')
             print(path)
@@ -115,8 +114,8 @@ for env_name in ['FetchPushMulti-v1', 'FetchPickAndPlaceMulti-v1', 'FetchSlideMu
                 '--agent_alg', model_name,
                 '--verbose', '2',
                 '--render', '0',
-                '--gamma', '0.98',
-                '--n_episodes', '50',
+                '--gamma', '0.99',
+                '--n_episodes', '200',
                 '--n_cycles', '50',
                 '--n_rollouts', '38',
                 '--n_test_rollouts', '380',
