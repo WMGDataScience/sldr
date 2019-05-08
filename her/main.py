@@ -217,6 +217,7 @@ def rollout(env, model, noise, config, normalizer=None, render=False, agent_id=0
             action_to_env[:,0:action.shape[1]] = action
             if ai_object:
                 action_to_env[:, action.shape[1]::] = model.get_obj_action(obs_goal[1]).cpu().numpy()
+            action_to_mem = action_to_env
         else:
             action_to_env = np.zeros((len(action), len(env.action_space.sample())))
             # if 'Fetch' in config['env_id']:
