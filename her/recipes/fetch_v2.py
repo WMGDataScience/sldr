@@ -52,7 +52,7 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
                 '--n_cycles', '50',
                 '--n_rollouts', '38',
                 '--n_test_rollouts', '38',
-                '--n_envs', '38',
+                '--n_envs', '1',
                 '--n_batches', '40',
                 '--batch_size', '4864',
                 '--obj_action_type', '0123456',
