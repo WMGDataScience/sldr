@@ -33,8 +33,10 @@ elif exp_config['env'] == 'Slide':
 
 if exp_config['use_her'] == 'True':
     use_her = True
+    print("training with HER")
 else:
     use_her = False
+    print("training without HER")
 
 for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
     if exp_config['obj_rew'] == 'True':
@@ -90,6 +92,7 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         backward_dyn = model.backward
         init_2 = init_q   
         run_2 = run_q
+        print("training with object based rewards")
     ####################### loading object ###########################
     elif exp_config['obj_rew'] == 'False':
         obj_rew = False
@@ -98,6 +101,7 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         backward_dyn = None
         init_2 = init
         run_2 = run
+        print("training without object based rewards")
 
     ####################### training robot ###########################  
     model_name = 'DDPG_BD'
