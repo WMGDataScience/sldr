@@ -141,7 +141,7 @@ for env_name in ['FetchPushMulti-v1', 'FetchPickAndPlaceMulti-v1', 'FetchSlideMu
 
         monitor2 = run_2(model2, experiment_args2, train=True)
 
-        rob_name = exp_config['env']
+        rob_name = env_name
         if obj_rew:
             if use_her:
                 rob_name = rob_name + '_DDPG_OURS_HER_'
