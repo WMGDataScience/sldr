@@ -16,7 +16,8 @@ import sys
 
 K.set_num_threads(1)
 
-filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
+#filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
+filepath='/home/ok18/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
 os.chdir(filepath)
 
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
