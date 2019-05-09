@@ -22,7 +22,7 @@ def hard_update(target, source):
 class DDPG_BD(object):
     def __init__(self, observation_space, action_space, optimizer, Actor, Critic, loss_func, gamma, tau, out_func=K.sigmoid,
                  discrete=True, regularization=False, normalized_rewards=False, agent_id=0, object_Qfunc=None, backward_dyn=None, 
-                 object_policy=None, reward_fun=None, masked_with_r=False, rnd_models=None, pred_th=0.0002,
+                 object_policy=None, reward_fun=None, masked_with_r=False, clip_Q_neg=None, 
                  dtype=K.float32, device="cuda"):
 
         super(DDPG_BD, self).__init__()
@@ -45,7 +45,13 @@ class DDPG_BD(object):
         self.object_Qfunc = object_Qfunc
         self.object_policy = object_policy
         self.masked_with_r = masked_with_r
-        self.pred_th = pred_th
+        if clip_Q_neg is not None:
+            self.clip_Q_neg = clip_Q_neg
+        else:
+            if self.object_Qfunc is None:
+                self.clip_Q_neg = -1./(1.-self.gamma)
+            else:
+                self.clip_Q_neg = -2./(1.-self.gamma)
 
         # model initialization
         self.entities = []
@@ -111,20 +117,8 @@ class DDPG_BD(object):
         else:
             self.get_obj_reward = self.reward_fun
 
-        if rnd_models is None:
-            self.rnd_model = RandomNetDist(observation_space).to(device)
-            self.rnd_target = RandomNetDist(observation_space).to(device)
-            self.rnd_optim = optimizer(self.rnd_model.parameters(), lr = critic_lr)
 
-            self.entities.append(self.rnd_optim)
-        else:
-            self.rnd_model = rnd_models[0]
-            self.rnd_target = rnd_models[1]
-
-        self.entities.append(self.rnd_model)
-        self.entities.append(self.rnd_target)
-
-        print('rnd clipped + r')
+        print('clipped + r')
 
     def to_cpu(self):
         for entity in self.entities:
@@ -184,15 +178,7 @@ class DDPG_BD(object):
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
         else:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
-
-            pred_error = self.get_pred_error(s2_)
-            mask = pred_error > self.pred_th
             r_intr = self.get_obj_reward(s2, s2_)
-            if running_rintr_mean is not None:
-                r_intr[mask] =  K.tensor(running_rintr_mean.get_stats(), dtype=s2.dtype, device=s2.device)
-            else:
-                r_intr[mask] = -0.5 
-
             if self.masked_with_r:
                 r = r_intr * K.abs(r) + r
             else:
@@ -202,10 +188,7 @@ class DDPG_BD(object):
         V = self.critics_target[0](s_, a_).detach()
 
         target_Q = (V * self.gamma) + r
-        if self.object_Qfunc is None:
-            target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
-        else:
-            target_Q = target_Q.clamp(-2/(1.-self.gamma), 0.)
+        target_Q = target_Q.clamp(self.clip_Q_neg, 0.)
 
         loss_critic = self.loss_func(Q, target_Q)
 
@@ -305,33 +288,3 @@ class DDPG_BD(object):
 
         return loss_backward_otw.item()
 
-    def get_pred_error(self, next_state):
-        with K.no_grad():
-            target = self.rnd_target(next_state)
-            pred = self.rnd_model(next_state)
-            
-        error = F.mse_loss(pred, target, reduction='none').mean(1)
-
-        return error
-
-    def update_coverage(self, batch, normalizer=None):
-        observation_space = self.observation_space - K.tensor(batch['g'], dtype=self.dtype, device=self.device).shape[1]
-
-        s2_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, observation_space:],
-                K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
-
-        if normalizer[1] is not None:
-            s2_ = normalizer[1].preprocess(s2_)
-
-        rnd_pred = self.rnd_model(s2_)
-        
-        with K.no_grad():
-            rnd_targ = self.rnd_target(s2_)
-
-        loss_rnd = self.loss_func(rnd_pred, rnd_targ.detach())
-
-        self.rnd_optim.zero_grad()
-        loss_rnd.backward()
-        self.rnd_optim.step()
-
-        return loss_rnd.item()

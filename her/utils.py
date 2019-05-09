@@ -247,6 +247,8 @@ def get_params(args=[], verbose=False):
     parser.add_argument('--pred_th', type=float, default=0.0002,
                         help='prediction error threshold)')
 
+    parser.add_argument('--clip_Q_neg', default=0, type=int,\
+                         help='Negative boundary for Target Q')
 
     # acquire in a dict
     config = parser.parse_args(args)

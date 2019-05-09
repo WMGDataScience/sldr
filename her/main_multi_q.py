@@ -83,7 +83,8 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                     gym.spaces.Box(-1., 1., shape=(n_actions-n_rob_actions,), dtype='float32'),
                     gym.spaces.Box(-1., 1., shape=(n_actions,), dtype='float32'))
 
-    GAMMA = config['gamma'] 
+    GAMMA = config['gamma']
+    clip_Q_neg = config['clip_Q_neg'] if config['clip_Q_neg'] < 0 else None
     TAU = config['tau'] 
     ACTOR_LR = config['plcy_lr'] 
     CRITIC_LR = config['crtc_lr'] 
@@ -117,7 +118,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                   regularization=REGULARIZATION, normalized_rewards=NORMALIZED_REWARDS,
                   agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
                   object_policy=object_policy, reward_fun=reward_fun, 
-                  n_objects=config['max_nb_objects'])
+                  n_objects=config['max_nb_objects'], clip_Q_neg=clip_Q_neg)
     normalizer = [Normalizer(), Normalizer()]
 
     for _ in range(1):

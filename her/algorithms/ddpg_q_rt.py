@@ -22,7 +22,7 @@ def hard_update(target, source):
 class DDPG_BD(object):
     def __init__(self, observation_space, action_space, optimizer, Actor, Critic, loss_func, gamma, tau, out_func=K.sigmoid,
                  discrete=True, regularization=False, normalized_rewards=False, agent_id=0, object_Qfunc=None, backward_dyn=None, 
-                 object_policy=None, reward_fun=None,
+                 object_policy=None, reward_fun=None, clip_Q_neg=None,
                  dtype=K.float32, device="cuda"):
 
         super(DDPG_BD, self).__init__()
@@ -44,6 +44,7 @@ class DDPG_BD(object):
         self.agent_id = agent_id
         self.object_Qfunc = object_Qfunc
         self.object_policy = object_policy
+        self.clip_Q_neg = clip_Q_neg if clip_Q_neg is not None else -1./(1.-self.gamma)
 
         # model initialization
         self.entities = []
@@ -212,7 +213,7 @@ class DDPG_BD(object):
         V = self.critics_target[1](s_, a_).detach()
 
         target_Q = (V * self.gamma) + r_intr_0
-        target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
+        target_Q = target_Q.clamp(self.clip_Q_neg, 0.)
 
         loss_critic = self.loss_func(Q, target_Q)
 
@@ -224,8 +225,8 @@ class DDPG_BD(object):
         Q = self.critics[2](s, a)       
         V = self.critics_target[2](s_, a_).detach()
 
-        target_Q = (V * self.gamma) + r_intr_1
-        target_Q = target_Q.clamp(-1./(1.-self.gamma), 0.)
+        target_Q = (V * self.gamma) + r_intr_1        
+        target_Q = target_Q.clamp(self.clip_Q_neg, 0.)
 
         loss_critic = self.loss_func(Q, target_Q)
 
