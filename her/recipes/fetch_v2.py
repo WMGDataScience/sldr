@@ -24,14 +24,17 @@ dtype = K.float32
 
 exp_config = get_exp_params(sys.argv[1:])
 
-# if exp_config['env'] == 'Push':
-#     env_name = 'FetchPushMulti-v1'
-# elif exp_config['env'] == 'PnP':
-#     env_name = 'FetchPickAndPlaceMulti-v1'
-# elif exp_config['env'] == 'Slide':
-#     env_name = 'FetchSlideMulti-v1'
+if exp_config['env'] == 'Push':
+     env_name_list = ['FetchPushMulti-v1']
+elif exp_config['env'] == 'PnP':
+     env_name_list = ['FetchPickAndPlaceMulti-v1']
+elif exp_config['env'] == 'Slide':
+     env_name_list = ['FetchSlideMulti-v1']
+elif exp_config['env'] == 'All':
+     env_name_list = ['FetchPushMulti-v1', 'FetchPickAndPlaceMulti-v1', 'FetchSlideMulti-v1']
 
-for env_name in ['FetchPushMulti-v1', 'FetchPickAndPlaceMulti-v1', 'FetchSlideMulti-v1']:
+
+for env_name in env_name_list:
 
     if exp_config['use_her'] == 'True':
         use_her = True
