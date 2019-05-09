@@ -24,14 +24,14 @@ dtype = K.float32
 
 exp_config = get_exp_params(sys.argv[1:])
 
-# if exp_config['env'] == 'Push':
-#     env_name = 'FetchPushMulti-v1'
-# elif exp_config['env'] == 'PnP':
-#     env_name = 'FetchPickAndPlaceMulti-v1'
-# elif exp_config['env'] == 'Slide':
-#     env_name = 'FetchSlideMulti-v1'
+if exp_config['env'] == 'Egg':
+     env_name_list = ['HandManipulateEggRotateMulti-v0']
+elif exp_config['env'] == 'Block':
+     env_name_list = ['HandManipulateBlockRotateXYZMulti-v0']
+elif exp_config['env'] == 'All':
+     env_name_list = ['HandManipulateEggRotateMulti-v0', 'HandManipulateBlockRotateXYZMulti-v0']
 
-for env_name in ['HandManipulateEggRotateMulti-v0', 'HandManipulateBlockRotateXYZMulti-v0']:
+for env_name in env_name_list:
 
     if exp_config['use_her'] == 'True':
         use_her = True
