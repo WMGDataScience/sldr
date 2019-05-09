@@ -16,8 +16,8 @@ import sys
 
 K.set_num_threads(1)
 
-filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
-#filepath='/home/ok18/Jupyter/notebooks/Reinforcement_Learning/'
+#filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
+filepath='/home/ok18/Jupyter/notebooks/Reinforcement_Learning/'
 os.chdir(filepath)
 
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
@@ -215,10 +215,6 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
 
     K.save(model_2.critics[0].state_dict(), path + '/robot_Qfunc.pt')
     K.save(model_2.actors[0].state_dict(), path + '/robot_policy.pt')
-    if obj_rew:
-        K.save(model_2.object_Qfunc.state_dict(), path + '/object_Qfunc.pt')
-        K.save(model_2.object_policy.state_dict(), path + '/object_policy.pt')
-        K.save(model_2.backward.state_dict(), path + '/backward_dyn.pt')
     
     with open(path + '/normalizer.pkl', 'wb') as file:
         pickle.dump(normalizer_2, file)
