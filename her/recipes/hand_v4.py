@@ -41,17 +41,22 @@ elif ENV == 'Pen':
 
 if exp_config['use_her'] == 'True':
     use_her = True
-    print("training with HER")
 else:
     use_her = False
-    print("training without HER")
 
 model_name = 'DDPG_BD'
 
 for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
+
+    if use_her:
+        print("training with HER")
+    else:
+        print("training without HER")
+
     if exp_config['obj_rew'] == 'True':
     ####################### loading object ###########################
-
+        print("training with object based rewards")
+        
         exp_args_0 = ['--env_id', env_name_0,
                 '--exp_id', model_name + '_fooobj_' + str(0),
                 '--random_seed', str(0), 
@@ -147,9 +152,9 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         backward_dyn = (model_0.backward, model_1.backward)
         init_2 = init_q   
         run_2 = run_q
-        print("training with object based rewards")
     ####################### loading object ###########################
     elif exp_config['obj_rew'] == 'False':
+        print("training without object based rewards")
         obj_rew = False
         object_Qfunc = None
         object_policy = None  
