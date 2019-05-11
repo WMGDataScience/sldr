@@ -24,7 +24,7 @@ dtype = K.float32
 
 exp_config = get_exp_params(sys.argv[1:])
 
-n_objects = exp_config['env']
+n_objects = int(exp_config['env'])
 n_episodes = (n_objects - 1) * 100
 env_name = 'FetchStackMulti{}-v1'.format(n_objects)
 print(env_name)
