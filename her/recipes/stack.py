@@ -25,6 +25,7 @@ dtype = K.float32
 exp_config = get_exp_params(sys.argv[1:])
 
 n_objects = exp_config['env']
+n_episodes = (n_objects - 1) * 100
 env_name = 'FetchStackMulti{}-v1'.format(n_objects)
 print(env_name)
 
@@ -111,7 +112,7 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
             '--render', '0',
             '--gamma', '0.98',
             #'--clip_Q_neg, '-100',
-            '--n_episodes', '50',
+            '--n_episodes', str(n_episodes),
             '--n_cycles', '50',
             '--n_rollouts', '38',
             '--n_test_rollouts', '380',
