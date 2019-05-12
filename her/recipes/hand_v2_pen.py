@@ -160,7 +160,7 @@ for env_name in env_name_list:
                 rob_name = rob_name + '_DDPG_'
 
 
-        path = './models_paper/batch/' + rob_name + '_' + str(i_exp)
+        path = './models_paper/batch/' + rob_name + str(i_exp) + '_098_100'
         try:  
             os.makedirs(path)
         except OSError:  
@@ -178,6 +178,6 @@ for env_name in env_name_list:
         with open(path + '/normalizer.pkl', 'wb') as file:
             pickle.dump(normalizer2, file)
 
-        path = './monitors_paper/batch/monitor_' + rob_name  + '_' + str(i_exp) + '.npy'
+        path = './monitors_paper/batch/monitor_' + rob_name  + str(i_exp) + '_098_100' + '.npy'
         np.save(path, monitor2)
 
