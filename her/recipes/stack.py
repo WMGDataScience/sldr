@@ -17,6 +17,7 @@ import sys
 K.set_num_threads(1)
 
 filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
+#filepath='/home/ok18/Jupyter/notebooks/Reinforcement_Learning/'
 os.chdir(filepath)
 
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
@@ -25,7 +26,7 @@ dtype = K.float32
 exp_config = get_exp_params(sys.argv[1:])
 
 n_objects = int(exp_config['env'])
-n_episodes = (n_objects - 1) * 100
+n_episodes = (n_objects - 1) * 120
 env_name = 'FetchStackMulti{}-v1'.format(n_objects)
 print(env_name)
 
