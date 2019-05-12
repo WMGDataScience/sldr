@@ -202,7 +202,7 @@ class DDPG_BD(object):
         # actor update
         a = self.actors[0](s)
 
-        loss_actor = -self.critics[0](s, a).mean() - 2*self.critics[1](s, a).mean()
+        loss_actor = -self.critics[0](s, a).mean() - self.critics[1](s, a).mean()
         
         if self.regularization:
             loss_actor += (self.actors[0](s)**2).mean()*1
