@@ -400,6 +400,7 @@ def run(model, experiment_args, train=True):
         plot_durations(np.asarray(episode_reward_mean), np.asarray(episode_success_mean))
         
         if best_succeess < np.mean(episode_succeess_cycle):
+            pdb.set_trace()
             bestmodel_critic = model.critics[0].state_dict()
             bestmodel_actor = model.actors[0].state_dict()
             best_succeess = np.mean(episode_succeess_cycle)
