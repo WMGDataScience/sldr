@@ -228,6 +228,9 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
     with open(path + '/normalizer.pkl', 'wb') as file:
         pickle.dump(normalizer_2, file)
 
+        with open(path + '/normalizer_best.pkl', 'wb') as file:
+            pickle.dump(bestmodel[2], file)
+
     path = './monitors_paper/batch2/monitor_' + rob_name  + str(i_exp) + '_098_100' + '.npy'
     np.save(path, monitor_2)
 

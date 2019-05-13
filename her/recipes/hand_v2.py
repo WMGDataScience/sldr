@@ -175,6 +175,9 @@ for env_name in env_name_list:
         with open(path + '/normalizer.pkl', 'wb') as file:
             pickle.dump(normalizer2, file)
 
+        with open(path + '/normalizer_best.pkl', 'wb') as file:
+            pickle.dump(bestmodel[2], file)
+
         path = './monitors_paper/batch2/monitor_' + rob_name + str(i_exp) + '.npy'
         np.save(path, monitor2)
 
