@@ -274,6 +274,13 @@ def rollout(env, model, noise, config, normalizer=None, render=False, agent_id=0
                 }
             
             trajectories[i_agent].append((state.copy(), action_to_mem, reward, next_state.copy(), done))
+        
+        goal_a = state_all['achieved_goal']
+        goal_b = state_all['desired_goal']
+        ENV_NAME = config['env_id'] 
+        if 'Rotate' in ENV_NAME:
+            goal_a = goal_a[:,3:]
+            goal_b = goal_b[:,3:]
 
         # Move to the next state
         state_all = next_state_all
@@ -282,6 +289,8 @@ def rollout(env, model, noise, config, normalizer=None, render=False, agent_id=0
         if render:
             frames.append(env.render(mode='rgb_array')[0])
 
+    frames = np.linalg.norm(goal_a - goal_b, axis=-1)
+    
     obs, ags, goals, acts = [], [], [], []
 
     for trajectory in trajectories:
@@ -323,13 +332,17 @@ def run(model, experiment_args, train=True):
     
     episode_reward_all = []
     episode_success_all = []
+    episode_distance_all = []
     episode_reward_mean = []
     episode_success_mean = []
+    episode_distance_mean = []
     critic_losses = []
     actor_losses = []
     backward_losses = []
     backward_otw_losses = []
     rnd_losses = []
+
+    best_succeess = -1
         
     for i_episode in range(N_EPISODES):
         
@@ -365,23 +378,32 @@ def run(model, experiment_args, train=True):
 
         episode_reward_cycle = []
         episode_succeess_cycle = []
+        episode_distance_cycle = []
         rollout_per_env = N_TEST_ROLLOUTS // config['n_envs']
         for i_rollout in range(rollout_per_env):
             render = config['render'] > 0 and i_episode % config['render'] == 0
-            _, episode_reward, success, _ = rollout(env, model, False, config, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
+            _, episode_reward, success, distance = rollout(env, model, False, config, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
                 
             episode_reward_cycle.extend(episode_reward)
             episode_succeess_cycle.extend(success)
+            episode_distance_cycle.extend(distance)
         # <-- end loop: i_rollout 
             
         ### MONITORIRNG ###
         episode_reward_all.append(episode_reward_cycle)
         episode_success_all.append(episode_succeess_cycle)
+        episode_distance_all.append(episode_distance_cycle)
 
         episode_reward_mean.append(np.mean(episode_reward_cycle))
         episode_success_mean.append(np.mean(episode_succeess_cycle))
+        episode_distance_mean.append(np.mean(episode_distance_cycle))
         plot_durations(np.asarray(episode_reward_mean), np.asarray(episode_success_mean))
         
+        if best_succeess < np.mean(episode_succeess_cycle):
+            bestmodel_critic = model.critics[0].state_dict()
+            bestmodel_actor = model.actors[0].state_dict()
+            best_succeess = np.mean(episode_succeess_cycle)
+
         if config['verbose'] > 0:
         # Printing out
             if (i_episode+1)%1 == 0:
@@ -392,7 +414,7 @@ def run(model, experiment_args, train=True):
                 print('  | Process pid: {}'.format(config['process_pid']))
                 print('  | Running mean of total reward: {}'.format(episode_reward_mean[-1]))
                 print('  | Success rate: {}'.format(episode_success_mean[-1]))
-                #print('  | Running mean of total reward: {}'.format(running_mean(episode_reward_all)[-1]))
+                print('  | Distance to target {}'.format(episode_distance_mean[-1]))
                 print('  | Time episode: {}'.format(time.time()-episode_time_start))
                 print('  | Time total: {}'.format(time.time()-total_time_start))
 
@@ -424,7 +446,7 @@ def run(model, experiment_args, train=True):
     else:
         print('Test completed')
 
-    return episode_reward_all, episode_success_all
+    return episode_reward_all, episode_success_all, episode_distance_all, (bestmodel_critic, bestmodel_actor)
 
 # set up matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
