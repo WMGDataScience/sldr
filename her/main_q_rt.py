@@ -312,6 +312,8 @@ def run(model, experiment_args, train=True):
     episode_success_mean = []
     critic_losses = []
     actor_losses = []
+
+    best_succeess = -1
         
     for i_episode in range(N_EPISODES):
         
@@ -355,6 +357,12 @@ def run(model, experiment_args, train=True):
         episode_reward_mean.append(np.mean(episode_reward_cycle))
         episode_success_mean.append(np.mean(episode_succeess_cycle))
         plot_durations(np.asarray(episode_reward_mean), np.asarray(episode_success_mean))
+
+        if best_succeess < np.mean(episode_succeess_cycle):
+            bestmodel_critic = model.critics[0].state_dict()
+            bestmodel_actor = model.actors[0].state_dict()
+            best_succeess = np.mean(episode_succeess_cycle)
+        
         
         if config['verbose'] > 0:
         # Printing out
@@ -375,7 +383,7 @@ def run(model, experiment_args, train=True):
     else:
         print('Test completed')
 
-    return episode_reward_all, episode_success_all
+    return episode_reward_all, episode_success_all, (bestmodel_critic, bestmodel_actor)
 
 # set up matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
