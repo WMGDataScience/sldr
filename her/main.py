@@ -2,6 +2,7 @@ import numpy as np
 import scipy as sc
 import time
 import imageio
+import copy
 
 import torch as K
 import torch.nn as nn
@@ -400,9 +401,9 @@ def run(model, experiment_args, train=True):
         plot_durations(np.asarray(episode_reward_mean), np.asarray(episode_success_mean))
         
         if best_succeess < np.mean(episode_succeess_cycle):
-            pdb.set_trace()
             bestmodel_critic = model.critics[0].state_dict()
             bestmodel_actor = model.actors[0].state_dict()
+            bestmodel_normalizer = copy.deepcopy(normalizer)
             best_succeess = np.mean(episode_succeess_cycle)
 
         if config['verbose'] > 0:
@@ -447,7 +448,7 @@ def run(model, experiment_args, train=True):
     else:
         print('Test completed')
 
-    return (episode_reward_all, episode_success_all, episode_distance_all), (bestmodel_critic, bestmodel_actor)
+    return (episode_reward_all, episode_success_all, episode_distance_all), (bestmodel_critic, bestmodel_actor, bestmodel_normalizer)
 
 # set up matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
