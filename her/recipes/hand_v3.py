@@ -190,7 +190,7 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         normalizer_2[2] = normalizer_1[1]
     experiment_args_2 = (env_2, memory_2, noise_2, config_2, normalizer_2, running_rintr_mean_2)
 
-    monitor_2 = run_2(model_2, experiment_args_2, train=True)
+    monitor_2, bestmodel = run_2(model_2, experiment_args_2, train=True)
 
     rob_name = env_name_2
     if obj_rew:
@@ -205,7 +205,7 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
             rob_name = rob_name + '_DDPG_'
 
 
-    path = './models_paper/batch/' + rob_name + str(i_exp)
+    path = './models_paper/batch2/' + rob_name + str(i_exp)
     try:  
         os.makedirs(path)
     except OSError:  
@@ -215,10 +215,13 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
 
     K.save(model_2.critics[0].state_dict(), path + '/robot_Qfunc.pt')
     K.save(model_2.actors[0].state_dict(), path + '/robot_policy.pt')
+
+    K.save(bestmodel[0], path + '/robot_Qfunc_best.pt')
+    K.save(bestmodel[1], path + '/robot_policy_best.pt')
     
     with open(path + '/normalizer.pkl', 'wb') as file:
         pickle.dump(normalizer_2, file)
 
-    path = './monitors_paper/batch/monitor_' + rob_name  + '_' + str(i_exp) + '.npy'
+    path = './monitors_paper/batch2/monitor_' + rob_name  + '_' + str(i_exp) + '.npy'
     np.save(path, monitor_2)
 
