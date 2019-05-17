@@ -42,7 +42,9 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                 env = gym.make(env_id, n_objects=config['max_nb_objects'], 
                                     obj_action_type=config['obj_action_type'], 
                                     observe_obj_grp=config['observe_obj_grp'],
-                                    obj_range=config['obj_range'])
+                                    obj_range=config['obj_range'],
+                                    change_stack_order=config['change_stack_order']
+                                    )
             elif env_type == 'Hand':
                 env = gym.make(env_id, obj_action_type=config['obj_action_type'])
             elif env_type == 'Others':
@@ -87,8 +89,22 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Others') for i_env in range(N_ENVS)])
         envs_test = None
 
-    def her_reward_fun(ag_2, g, info):  # vectorized
+    def her_reward_fun_sparse(ag_2, g, info):  # vectorized
         return dummy_env.compute_reward(achieved_goal=ag_2, desired_goal=g, info=info)
+
+    def her_reward_fun_step(ag_2, g, info):
+        goal_a = ag_2
+        goal_b = g
+        assert goal_a.shape == goal_b.shape
+        goal_a = goal_a.reshape(-1,dummy_env.env.n_objects,3)
+        goal_b = goal_b.reshape(-1,dummy_env.env.n_objects,3)
+        d = np.linalg.norm(goal_a - goal_b, axis=-1)
+        return -(d > dummy_env.env.distance_threshold).astype(np.float32).sum(-1)
+
+    if config['use_step_reward_fun']:
+        her_reward_fun = her_reward_fun_step
+    else:
+        her_reward_fun = her_reward_fun_sparse
 
     K.manual_seed(SEED)
     np.random.seed(SEED)

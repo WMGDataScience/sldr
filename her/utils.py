@@ -250,6 +250,14 @@ def get_params(args=[], verbose=False):
     parser.add_argument('--clip_Q_neg', default=0, type=int,\
                          help='Negative boundary for Target Q')
 
+    parser.add_argument("--change_stack_order", default="False",
+                        choices=['True', 'False'],
+                        help="Whether or not to change the object order in stacking")
+
+    parser.add_argument("--use_step_reward_fun", default="False",
+                        choices=['True', 'False'],
+                        help="Whether or not to use step reward instead of sparse")
+
     # acquire in a dict
     config = parser.parse_args(args)
     args   = vars(config)
@@ -326,18 +334,30 @@ def get_params(args=[], verbose=False):
     else:
         args['observe_obj_grp'] = False
 
-    # object type observablity
+    # masking aux reward with reward 
     if args['masked_with_r'] == 'True':
         args['masked_with_r'] = True
     else:
         args['masked_with_r'] = False
 
-
-    # object type observablity
+    # using gae in PPO
     if args['use_gae'] == 'True':
         args['use_gae'] = True
     else:
         args['use_gae'] = False
+
+    # Whether or not to change the object order in stacking
+    if args['change_stack_order'] == 'True':
+        args['change_stack_order'] = True
+    else:
+        args['change_stack_order'] = False
+
+    # Whether or not to use step reward instead of sparse
+    if args['use_step_reward_fun'] == 'True':
+        args['use_step_reward_fun'] = True
+    else:
+        args['use_step_reward_fun'] = False
+
 
     obj_action_type = []
     for i in args['obj_action_type']:
