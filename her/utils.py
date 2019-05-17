@@ -597,11 +597,10 @@ def get_exp_params(args=[], verbose=False):
     parser.add_argument("--rob_model")
     parser.add_argument("--obj_rew")
     parser.add_argument("--use_her")
-    parser.add_argument("--masked_with_r")
     parser.add_argument("--n_exp")
-    parser.add_argument("--multiseed")
     parser.add_argument("--start_n_exp")
-    parser.add_argument("--pred_th")
+    parser.add_argument("--change_stack_order")
+    parser.add_argument("--use_step_reward_fun")
 
     # acquire in a dict
     config = parser.parse_args(args)
