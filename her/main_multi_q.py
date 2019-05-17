@@ -103,8 +103,13 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
 
     if config['use_step_reward_fun']:
         her_reward_fun = her_reward_fun_step
+        print('using step reward')
     else:
         her_reward_fun = her_reward_fun_sparse
+        print('using sparse reward')
+    
+    if config['change_stack_order']:
+        print('changing the stacking order')
 
     K.manual_seed(SEED)
     np.random.seed(SEED)
