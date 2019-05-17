@@ -26,7 +26,7 @@ dtype = K.float32
 exp_config = get_exp_params(sys.argv[1:])
 
 n_objects = int(exp_config['env'])
-n_episodes = (n_objects - 1) * 120
+n_episodes = (n_objects - 1) * 100
 env_name = 'FetchStackMulti{}-v1'.format(n_objects)
 print(env_name)
 
@@ -123,6 +123,8 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
             '--obj_action_type', '0123456',
             '--max_nb_objects', str(n_objects),
             '--observe_obj_grp', 'False',
+            '--change_stack_order', exp_config['change_stack_order'],
+            '--use_step_reward_fun', exp_config['use_step_reward_fun']  
             ]
 
     config2 = get_params(args=exp_args2)
@@ -136,7 +138,7 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         normalizer2[1] = normalizer[1]
     experiment_args2 = (env2, memory2, noise2, config2, normalizer2, running_rintr_mean2)
 
-    monitor2 = run_2(model2, experiment_args2, train=True)
+    monitor2, bestmodel = run_2(model2, experiment_args2, train=True)
 
     rob_name = env_name
     if obj_rew:
@@ -150,8 +152,17 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         else:
             rob_name = rob_name + '_DDPG_'
 
+    if exp_config['change_stack_order']:
+        order_suffix = 'changing_'
+    else:
+        order_suffix = 'fixed_'    
+    
+    if exp_config['use_step_reward_fun']:
+        rew_suffix = 'step_'
+    else:
+        rew_suffix = 'sparse_'
 
-    path = './models_paper/batch/' + rob_name + '_' + str(i_exp)
+    path = './models_paper/batch/' + rob_name + order_suffix + rew_suffix + str(i_exp)
     try:  
         os.makedirs(path)
     except OSError:  
@@ -161,6 +172,9 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
 
     K.save(model2.critics[0].state_dict(), path + '/robot_Qfunc.pt')
     K.save(model2.actors[0].state_dict(), path + '/robot_policy.pt')
+    
+    K.save(bestmodel[0], path + '/robot_Qfunc_best.pt')
+    K.save(bestmodel[1], path + '/robot_policy_best.pt')
     if obj_rew:
         K.save(model2.object_Qfunc.state_dict(), path + '/object_Qfunc.pt')
         K.save(model2.backward.state_dict(), path + '/backward_dyn.pt')
@@ -169,6 +183,9 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
     with open(path + '/normalizer.pkl', 'wb') as file:
         pickle.dump(normalizer2, file)
 
-    path = './monitors_paper/batch/monitor_' + rob_name  + '_' + str(i_exp) + '.npy'
+    with open(path + '/normalizer_best.pkl', 'wb') as file:
+        pickle.dump(bestmodel[2], file)
+
+    path = './monitors_paper/batch/monitor_' + rob_name + order_suffix + rew_suffix + str(i_exp) + '.npy'
     np.save(path, monitor2)
 
