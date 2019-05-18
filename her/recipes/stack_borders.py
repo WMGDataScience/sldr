@@ -27,7 +27,7 @@ exp_config = get_exp_params(sys.argv[1:])
 
 n_objects = int(exp_config['env'])
 n_episodes = (n_objects - 1) * 100
-env_name = 'FetchStackMulti{}-v1'.format(n_objects)
+env_name = 'FetchStackBordersMulti{}-v1'.format(n_objects)
 print(env_name)
 
 if exp_config['use_her'] == 'True':
