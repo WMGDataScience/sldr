@@ -36,13 +36,15 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     SEED = config['random_seed']
     N_ENVS = config['n_envs']
 
-    def make_env(env_id, i_env, env_type='Fetch', ai_object=False):
+    def make_env(env_id, i_env, env_type='Fetch', ai_object=False, stack_prob=None):
         def _f():
             if env_type == 'Fetch':
                 env = gym.make(env_id, n_objects=config['max_nb_objects'], 
                                     obj_action_type=config['obj_action_type'], 
                                     observe_obj_grp=config['observe_obj_grp'],
-                                    obj_range=config['obj_range'])
+                                    obj_range=config['obj_range'],
+                                    change_stack_order=config['change_stack_order']
+                                    )
             elif env_type == 'Hand':
                 env = gym.make(env_id, obj_action_type=config['obj_action_type'])
             elif env_type == 'Others':
@@ -52,31 +54,62 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
             env = gym.wrappers.FlattenDictWrapper(env, dict_keys=list(keys))
             env.seed(SEED+10*i_env)
             env.unwrapped.ai_object = ai_object
+            if stack_prob is not None:
+                env.unwrapped.stack_prob = stack_prob
             return env
         return _f   
 
-    if 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME:
+    if 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME and 'Stack' in ENV_NAME:
+        dummy_env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], 
+                                    obj_action_type=config['obj_action_type'], 
+                                    observe_obj_grp=config['observe_obj_grp'],
+                                    obj_range=config['obj_range'])
+        envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', False) for i_env in range(N_ENVS)])
+        envs_test = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', False, stack_prob=1) for i_env in range(N_ENVS)])
+        n_rob_actions = 4
+        n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
+    elif 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME:
         dummy_env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], 
                                     obj_action_type=config['obj_action_type'], 
                                     observe_obj_grp=config['observe_obj_grp'],
                                     obj_range=config['obj_range'])
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(N_ENVS)])
+        envs_test = None
         n_rob_actions = 4
         n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
         #n_actions = config['max_nb_objects'] * 3 + n_rob_actions
     elif 'HandManipulate' in ENV_NAME and 'Multi' in ENV_NAME:
         dummy_env = gym.make(ENV_NAME, obj_action_type=config['obj_action_type'])
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Hand', agent == 'object') for i_env in range(N_ENVS)])
+        envs_test = None
         n_rob_actions = 20
         n_actions = 1 * len(config['obj_action_type']) + n_rob_actions
-        #n_actions = 1 * 4 + n_rob_actions
     else:
         dummy_env = gym.make(ENV_NAME)
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Others', agent == 'object') for i_env in range(N_ENVS)])
+        envs_test = None
 
-    def her_reward_fun(ag_2, g, info):  # vectorized
+    def her_reward_fun_sparse(ag_2, g, info):  # vectorized
         return dummy_env.compute_reward(achieved_goal=ag_2, desired_goal=g, info=info)
 
+    def her_reward_fun_step(ag_2, g, info):
+        goal_a = ag_2
+        goal_b = g
+        assert goal_a.shape == goal_b.shape
+        goal_a = goal_a.reshape(-1,dummy_env.env.n_objects,3)
+        goal_b = goal_b.reshape(-1,dummy_env.env.n_objects,3)
+        d = np.linalg.norm(goal_a - goal_b, axis=-1)
+        return -(d > dummy_env.env.distance_threshold).astype(np.float32).sum(-1)
+
+    if config['use_step_reward_fun']:
+        her_reward_fun = her_reward_fun_step
+        print('using step reward')
+    else:
+        her_reward_fun = her_reward_fun_sparse
+        print('using sparse reward')
+    
+    if config['change_stack_order']:
+        print('changing the stacking order')
 
     K.manual_seed(SEED)
     np.random.seed(SEED)
@@ -169,7 +202,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
         }
     memory = ReplayBuffer(buffer_shapes, MEM_SIZE, config['episode_length'], sample_her_transitions)
 
-    experiment_args = (envs, memory, noise, config, normalizer, agent_id)
+    experiment_args = ((envs,envs_test), memory, noise, config, normalizer, agent_id)
           
     return model, experiment_args
 
@@ -322,6 +355,9 @@ def run(model, experiment_args, train=True):
     total_time_start =  time.time()
 
     env, memory, noise, config, normalizer, agent_id = experiment_args
+    env, test_env = env
+    if test_env is None:
+        test_env = env
     
     N_EPISODES = config['n_episodes'] if train else config['n_episodes_test']
     N_CYCLES = config['n_cycles']
@@ -348,12 +384,17 @@ def run(model, experiment_args, train=True):
     for i_episode in range(N_EPISODES):
         
         episode_time_start = time.time()
+        episode_reward_cycle_train = []
+        episode_succeess_cycle_train = []
         if train:
             for i_cycle in range(N_CYCLES):
                 
                 ai_object = 1 if np.random.rand() < config['ai_object_rate']  else 0
-                trajectories, _, _, _ = rollout(env, model, noise, config, normalizer, render=False, agent_id=agent_id, ai_object=ai_object, rob_policy=config['rob_policy'])
+                trajectories, episode_reward, success, _ = rollout(env, model, noise, config, normalizer, render=False, agent_id=agent_id, ai_object=ai_object, rob_policy=config['rob_policy'])
                 memory.store_episode(trajectories.copy())   
+
+                episode_reward_cycle_train.extend(episode_reward)
+                episode_succeess_cycle_train.extend(success)
               
                 for i_batch in range(N_BATCHES):  
                     model.to_cuda()
@@ -383,7 +424,7 @@ def run(model, experiment_args, train=True):
         rollout_per_env = N_TEST_ROLLOUTS // config['n_envs']
         for i_rollout in range(rollout_per_env):
             render = config['render'] > 0 and i_episode % config['render'] == 0
-            _, episode_reward, success, distance = rollout(env, model, False, config, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
+            _, episode_reward, success, distance = rollout(test_env, model, False, config, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
                 
             episode_reward_cycle.extend(episode_reward)
             episode_succeess_cycle.extend(success)
@@ -414,6 +455,8 @@ def run(model, experiment_args, train=True):
                 print('  | Exp description: {}'.format(config['exp_descr']))
                 print('  | Env: {}'.format(config['env_id']))
                 print('  | Process pid: {}'.format(config['process_pid']))
+                print('  | Running mean of total reward - training: {}'.format(np.mean(episode_reward_cycle_train)))
+                print('  | Success rate - training: {}'.format(np.mean(episode_succeess_cycle_train)))
                 print('  | Running mean of total reward: {}'.format(episode_reward_mean[-1]))
                 print('  | Success rate: {}'.format(episode_success_mean[-1]))
                 print('  | Distance to target {}'.format(episode_distance_mean[-1]))
