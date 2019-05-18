@@ -162,7 +162,7 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
     else:
         rew_suffix = 'sparse_'
 
-    path = './models_paper/batch/' + rob_name + order_suffix + rew_suffix + str(i_exp)
+    path = './models_paper/batch2/' + rob_name + order_suffix + rew_suffix + str(i_exp)
     try:  
         os.makedirs(path)
     except OSError:  
@@ -186,6 +186,6 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
     with open(path + '/normalizer_best.pkl', 'wb') as file:
         pickle.dump(bestmodel[2], file)
 
-    path = './monitors_paper/batch/monitor_' + rob_name + order_suffix + rew_suffix + str(i_exp) + '.npy'
+    path = './monitors_paper/batch2/monitor_' + rob_name + order_suffix + rew_suffix + str(i_exp) + '.npy'
     np.save(path, monitor2)
 
