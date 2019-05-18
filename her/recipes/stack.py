@@ -152,12 +152,12 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         else:
             rob_name = rob_name + '_DDPG_'
 
-    if exp_config['change_stack_order']:
+    if exp_config['change_stack_order'] == 'True':
         order_suffix = 'changing_'
     else:
         order_suffix = 'fixed_'    
     
-    if exp_config['use_step_reward_fun']:
+    if exp_config['use_step_reward_fun'] == 'True':
         rew_suffix = 'step_'
     else:
         rew_suffix = 'sparse_'
