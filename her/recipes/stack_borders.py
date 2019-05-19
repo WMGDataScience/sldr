@@ -5,7 +5,9 @@ import time
 import torch as K
 
 from her.utils import get_params as get_params, running_mean, get_exp_params
-from her.main_multi import init, run
+from her.main import init, run
+from her.main_multi import init as init_multi
+from her.main_multi import run as run_multi
 from her.main_multi_q import init as init_q
 from her.main_multi_q import run as run_q
 import matplotlib.pyplot as plt
@@ -100,8 +102,8 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         object_Qfunc = None
         object_policy = None  
         backward_dyn = None
-        init_2 = init
-        run_2 = run
+        init_2 = init_multi
+        run_2 = run_multi
 
     ####################### training robot ###########################  
     model_name = 'DDPG_BD'
