@@ -258,6 +258,10 @@ def get_params(args=[], verbose=False):
                         choices=['True', 'False'],
                         help="Whether or not to use step reward instead of sparse")
 
+    parser.add_argument("--test_on_stack_only", default="True",
+                        choices=['True', 'False'],
+                        help="Whether or not to use stacking only test")
+
     # acquire in a dict
     config = parser.parse_args(args)
     args   = vars(config)
@@ -357,6 +361,12 @@ def get_params(args=[], verbose=False):
         args['use_step_reward_fun'] = True
     else:
         args['use_step_reward_fun'] = False
+
+    # Whether or not to use step reward instead of sparse
+    if args['test_on_stack_only'] == 'False':
+        args['test_on_stack_only'] = False
+    else:
+        args['test_on_stack_only'] = True
 
 
     obj_action_type = []
