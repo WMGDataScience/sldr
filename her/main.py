@@ -420,6 +420,8 @@ def run(model, experiment_args, train=True):
                 print('  | Time episode: {}'.format(time.time()-episode_time_start))
                 print('  | Time total: {}'.format(time.time()-total_time_start))
 
+    # <-- end loop: i_episode
+
     if train and agent_id==1:
         print('Training Backward Model')
         model.to_cuda()
@@ -441,8 +443,6 @@ def run(model, experiment_args, train=True):
         #             rnd_losses.append(rnd_loss)
         # plot_durations(np.asarray(rnd_losses), np.asarray(rnd_losses))
 
-            
-    # <-- end loop: i_episode
     if train:
         print('Training completed')
     else:
