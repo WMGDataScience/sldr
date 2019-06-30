@@ -91,7 +91,7 @@ class DDPG_BD(object):
         # backward dynamics model for object actions and others 
         if self.object_backward is not None:
             for backward in self.object_backward:
-                self.entities.append(x)
+                self.entities.append(backward)
 
         # Learnt Q function for object and other 
         if self.object_Qfunc is not None:
