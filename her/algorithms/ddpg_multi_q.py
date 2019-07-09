@@ -44,6 +44,7 @@ class DDPG_BD(object):
         self.agent_id = agent_id
         self.object_Qfunc = object_Qfunc
         self.object_policy = object_policy
+        self.object_backward = backward_dyn
         self.n_objects = n_objects
         self.clip_Q_neg = clip_Q_neg if clip_Q_neg is not None else -1./(1.-self.gamma)
 
@@ -87,15 +88,9 @@ class DDPG_BD(object):
         self.entities.extend(self.critics_target)
         self.entities.extend(self.critics_optim)
 
-        # backward dynamics model
-        if backward_dyn is None:
-            self.backward = BackwardDyn(observation_space, action_space[1]).to(device)
-            self.backward_optim = optimizer(self.backward.parameters(), lr = critic_lr)
-            self.entities.append(self.backward)
-            self.entities.append(self.backward_optim)
-        else:
-            self.backward = backward_dyn
-            self.entities.append(self.backward)
+        # backward dynamics model for object actions
+        if self.object_backward is not None:
+            self.entities.append(self.object_backward)
 
         # Learnt Q function for object
         if self.object_Qfunc is not None:
@@ -109,6 +104,17 @@ class DDPG_BD(object):
             self.get_obj_reward = reward_fun
         else:
             self.get_obj_reward = self.reward_fun
+
+        # backward dynamics model for object actions
+        self.backward = BackwardDyn(observation_space, action_space[0]).to(device)
+        self.backward_optim = optimizer(self.backward.parameters(), lr = critic_lr)
+        self.entities.append(self.backward)
+        self.entities.append(self.backward_optim)
+
+        self.backward_otw = BackwardDyn(observation_space, action_space[0]).to(device)
+        self.backward_otw_optim = optimizer(self.backward_otw.parameters(), lr = critic_lr)
+        self.entities.append(self.backward_otw)
+        self.entities.append(self.backward_otw_optim)
 
         print('seperaate Qs')
 
@@ -243,8 +249,62 @@ class DDPG_BD(object):
 
     def reward_fun(self, state, next_state):
         with K.no_grad():
-            action = self.backward(state.to(self.device), next_state.to(self.device))
+            action = self.object_backward(state.to(self.device), next_state.to(self.device))
             opt_action = self.object_policy(state.to(self.device))
 
             reward = self.object_Qfunc(state.to(self.device), action) - self.object_Qfunc(state.to(self.device), opt_action)
         return reward.clamp(min=-1.0, max=0.0)
+
+    def update_backward(self, batch, normalizer=None):
+
+        observation_space = self.observation_space - K.tensor(batch['g'], dtype=self.dtype, device=self.device).shape[1]
+        action_space = self.action_space[0].shape[0]
+        
+        s1 = K.cat([K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, 0:observation_space],
+                    K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+
+        a1 = K.tensor(batch['u'], dtype=self.dtype, device=self.device)[:, 0:action_space]
+
+        s1_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, 0:observation_space],
+                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+
+        if normalizer[0] is not None:
+            s1 = normalizer[0].preprocess(s1)
+            s1_ = normalizer[0].preprocess(s1_)
+
+        a1_pred = self.backward(s1, s1_)
+
+        loss_backward = self.loss_func(a1_pred, a1)
+
+        self.backward_optim.zero_grad()
+        loss_backward.backward()
+        self.backward_optim.step()
+
+        return loss_backward.item()
+
+    def update_backward_otw(self, batch, normalizer=None):
+
+        observation_space = self.observation_space - K.tensor(batch['g'], dtype=self.dtype, device=self.device).shape[1]
+        action_space = self.action_space[0].shape[0]
+        
+        s1 = K.cat([K.tensor(batch['o'], dtype=self.dtype, device=self.device)[:, 0:observation_space],
+                    K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+
+        a1 = K.tensor(batch['u'], dtype=self.dtype, device=self.device)[:, 0:action_space]
+
+        s1_ = K.cat([K.tensor(batch['o_2'], dtype=self.dtype, device=self.device)[:, 0:observation_space],
+                     K.tensor(batch['g'], dtype=self.dtype, device=self.device)], dim=-1)
+
+        if normalizer[0] is not None:
+            s1 = normalizer[0].preprocess(s1)
+            s1_ = normalizer[0].preprocess(s1_)
+
+        a1_pred = self.backward_otw(s1, s1_)
+
+        loss_backward_otw = self.loss_func(a1_pred, a1)
+
+        self.backward_otw_optim.zero_grad()
+        loss_backward_otw.backward()
+        self.backward_otw_optim.step()
+
+        return loss_backward_otw.item()

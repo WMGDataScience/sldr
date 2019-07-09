@@ -56,7 +56,7 @@ def get_obj_obs(obs, goal, n_object):
     l_b = l_a+3*l_x*n_object
     l_c = l_b+2
     l_d = l_c+3*l_y*n_object
-    l_e = l_d+6
+    l_e = l_d+5
     
     ind1 = slice(0,l_a)
     ind2 = slice(l_a,l_b)
@@ -78,6 +78,38 @@ def get_obj_obs(obs, goal, n_object):
     obj_obs_all = K.stack(obj_obs_all, dim=-1)
     
     return obj_obs_all
+
+def get_rob_obs(obj_obs_all, n_object):
+    
+    l_x = 2
+    l_y = 3
+    l_z = 1
+
+    l_a = 3
+    l_b = l_a+3*l_x*1
+    l_c = l_b+2
+    l_d = l_c+3*l_y*1
+    l_e = l_d+5
+    l_f = l_e+3*l_z*1
+    
+    ind1 = slice(0,l_a)
+    ind2 = slice(l_a,l_b)
+    ind3 = slice(l_b,l_c)
+    ind4 = slice(l_c,l_d)
+    ind5 = slice(l_d,l_e)
+    ind6 = slice(l_e,l_f)
+
+    obj = []
+    obj.append(obj_obs_all[:,ind1,0])
+    obj.append(K.cat([obj_obs_all[:,ind2,i].view(-1,l_x,1,3) for i in range(n_object)], dim=2).view(-1, l_x*n_object*3))
+    obj.append(obj_obs_all[:,ind3,0])
+    obj.append(K.cat([obj_obs_all[:,ind4,i].view(-1,l_y,1,3) for i in range(n_object)], dim=2).view(-1, l_y*n_object*3))
+    obj.append(obj_obs_all[:,ind5,0])
+
+    obj = K.cat(obj, dim=-1)
+    goal = K.cat([obj_obs_all[:,ind6,i].view(-1,l_z,1,3) for i in range(n_object)], dim=2).view(-1, l_z*n_object*3)
+    
+    return K.cat([obj, goal], dim=-1)
 
 
 def get_params(args=[], verbose=False):
@@ -262,6 +294,15 @@ def get_params(args=[], verbose=False):
                         choices=['True', 'False'],
                         help="Whether or not to use stacking only test")
 
+    parser.add_argument("--train_robot_backward", default="False",
+                        choices=['True', 'False'],
+                        help="Whether or not to train backward model for the robot")
+    
+    parser.add_argument('--nb_objects_in_prebot', default=2, type=int,\
+                         help='number of objects used in the training of prebot')
+    
+    parser.add_argument('--nb_objects_to_ignore', default=0, type=int,\
+                         help='number of objects to be ignored in aux rewards')
     # acquire in a dict
     config = parser.parse_args(args)
     args   = vars(config)
@@ -368,6 +409,10 @@ def get_params(args=[], verbose=False):
     else:
         args['test_on_stack_only'] = True
 
+    if args['train_robot_backward'] == 'False':
+        args['train_robot_backward'] = False
+    else:
+        args['train_robot_backward'] = True
 
     obj_action_type = []
     for i in args['obj_action_type']:

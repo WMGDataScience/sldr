@@ -359,6 +359,8 @@ def run(model, experiment_args, train=True):
     episode_success_mean = []
     critic_losses = []
     actor_losses = []
+    backward_losses = []
+    backward_otw_losses = []
 
     best_succeess = -1
         
@@ -387,6 +389,13 @@ def run(model, experiment_args, train=True):
                         actor_losses.append(actor_loss)
 
                 model.update_target()
+
+                # if config['train_robot_backward']:
+                #     for i_batch in range(N_BATCHES):
+                #         batch = memory.sample(BATCH_SIZE)
+                #         backward_otw_loss = model.update_backward_otw(batch, normalizer)  
+                #         if i_batch == N_BATCHES - 1:
+                #             backward_otw_losses.append(backward_otw_loss)
 
             # <-- end loop: i_cycle
         plot_durations(np.asarray(critic_losses), np.asarray(actor_losses))
@@ -432,6 +441,19 @@ def run(model, experiment_args, train=True):
                 print('  | Time total: {}'.format(time.time()-total_time_start))
             
     # <-- end loop: i_episode
+
+    if train and config['train_robot_backward']:
+        print('Training Backward Model')
+        model.to_cuda()
+        for _ in range(N_EPISODES*N_CYCLES):
+            for i_batch in range(N_BATCHES):
+                batch = memory.sample(BATCH_SIZE)
+                backward_loss = model.update_backward(batch, normalizer)  
+                if i_batch == N_BATCHES - 1:
+                    backward_losses.append(backward_loss)
+
+        plot_durations(np.asarray(backward_otw_losses), np.asarray(backward_losses))
+
     if train:
         print('Training completed')
     else:
