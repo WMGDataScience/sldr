@@ -57,14 +57,24 @@ def init(config, agent='robot', her=False, object_Qfunc=None,
             return env
         return _f    
 
-    if 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME:
+    if 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME and 'Flex' not in ENV_NAME:
         dummy_env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], 
                                     obj_action_type=config['obj_action_type'], 
                                     observe_obj_grp=config['observe_obj_grp'],
                                     obj_range=config['obj_range'])
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch') for i_env in range(N_ENVS)])
+        envs_test = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch') for i_env in range(1)])
         n_rob_actions = 4
         n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
+    elif 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME and 'Flex' in ENV_NAME:
+        dummy_env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], 
+                                    obj_action_type=config['obj_action_type'], 
+                                    observe_obj_grp=config['observe_obj_grp'],
+                                    obj_range=config['obj_range'])
+        envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch') for i_env in range(N_ENVS)])
+        envs_test = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch') for i_env in range(1)])
+        n_rob_actions = 4
+        n_actions = (config['max_nb_objects']+1)//2 * len(config['obj_action_type']) + n_rob_actions
     elif 'HandManipulate' in ENV_NAME and 'Multi' in ENV_NAME:
         dummy_env = gym.make(ENV_NAME, obj_action_type=config['obj_action_type'])
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Hand') for i_env in range(N_ENVS)])
@@ -161,7 +171,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None,
         }
     memory = ReplayBuffer(buffer_shapes, MEM_SIZE, config['episode_length'], sample_her_transitions)
 
-    experiment_args = (envs, memory, noise, config, normalizer, None)
+    experiment_args = ((envs,envs_test), memory, noise, config, normalizer, None)
 
     print('no normaliser update') 
 
@@ -286,7 +296,8 @@ def run(model, experiment_args, train=True):
 
     total_time_start =  time.time()
 
-    env, memory, noise, config, normalizer, _ = experiment_args
+    envs, memory, noise, config, normalizer, _ = experiment_args
+    env, env_test = envs
     
     N_EPISODES = config['n_episodes'] if train else config['n_episodes_test']
     N_CYCLES = config['n_cycles']
@@ -331,11 +342,14 @@ def run(model, experiment_args, train=True):
         episode_succeess_cycle = []
         rollout_per_env = N_TEST_ROLLOUTS // config['n_envs']
         for i_rollout in range(rollout_per_env):
-            render = config['render'] > 0 and i_episode % config['render'] == 0
+            render = config['render'] == 2 and i_episode % config['render'] == 0
             _, episode_reward, success, _ = rollout(env, model, False, config, normalizer=normalizer, render=render)
                 
             episode_reward_cycle.extend(episode_reward)
             episode_succeess_cycle.extend(success)
+        for i_rollout in range(10):
+            render = config['render'] == 1 and i_episode % config['render'] == 0
+            _, episode_reward, success, _ = rollout(env_test, model, False, config, normalizer=normalizer, render=render)
         # <-- end loop: i_rollout 
             
         ### MONITORIRNG ###
