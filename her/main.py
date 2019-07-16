@@ -73,7 +73,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(N_ENVS)])
         envs_test = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(1)])
         n_rob_actions = 4
-        n_actions = (config['max_nb_objects']+1)//2 * len(config['obj_action_type']) + n_rob_actions
+        n_actions = 2 * len(config['obj_action_type']) + n_rob_actions
         #n_actions = config['max_nb_objects'] * 3 + n_rob_actions
     elif 'HandManipulate' in ENV_NAME and 'Multi' in ENV_NAME:
         dummy_env = gym.make(ENV_NAME, obj_action_type=config['obj_action_type'])
