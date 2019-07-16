@@ -11,7 +11,7 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms.ddpg_multi_q_v2 import DDPG_BD
+from her.algorithms.ddpg_multi_q_bot import DDPG_BD
 from her.algorithms.maddpg import MADDPG_BD
 from her.experience import Normalizer
 from her.exploration import Noise
