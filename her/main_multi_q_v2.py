@@ -11,11 +11,11 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms.ddpg_multi_q import DDPG_BD
+from her.algorithms.ddpg_multi_q_v2 import DDPG_BD
 from her.algorithms.maddpg import MADDPG_BD
 from her.experience import Normalizer
 from her.exploration import Noise
-from her.utils import Saver, Summarizer, get_params, running_mean, get_obj_obs
+from her.utils import Saver, Summarizer, get_params, running_mean, get_obj_obs, get_rob_obs
 from her.agents.basic import Actor 
 from her.agents.basic import Critic
 
@@ -66,10 +66,8 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                                     observe_obj_grp=config['observe_obj_grp'],
                                     obj_range=config['obj_range'])
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch') for i_env in range(N_ENVS)])
-        if config['test_on_stack_only']:
-            envs_test = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', 1) for i_env in range(N_ENVS)])
-        else:
-            envs_test = None           
+        envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', config['train_stack_prob']) for i_env in range(N_ENVS)])
+        envs_test = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', config['test_stack_prob']) for i_env in range(N_ENVS)]) 
         n_rob_actions = 4
         n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
     elif 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME:
@@ -157,8 +155,9 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                   regularization=REGULARIZATION, normalized_rewards=NORMALIZED_REWARDS,
                   agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
                   object_policy=object_policy, reward_fun=reward_fun, 
-                  n_objects=config['max_nb_objects'], clip_Q_neg=clip_Q_neg)
-    normalizer = [Normalizer(), Normalizer()]
+                  n_objects=[config['max_nb_objects'], config['nb_objects_in_prebot'], config['nb_objects_to_ignore']],
+                  clip_Q_neg=clip_Q_neg)
+    normalizer = [Normalizer(), Normalizer(), Normalizer()]
 
     for _ in range(1):
         state_all = dummy_env.reset()
@@ -242,17 +241,22 @@ def rollout(env, model, noise, config, normalizer=None, render=False,):
         if normalizer[0] is not None:
             obs_goal[0] = normalizer[0].preprocess_with_update(obs_goal[0])
 
-        if model.n_objects <= 1:
+        if model.n_objects[0] <= 1:
             obs_goal.append(K.cat([obs[1], goal], dim=-1))            
             if normalizer[1] is not None:
                 obs_goal[1] = normalizer[1].preprocess(obs_goal[1])
         else:
-            obs_goal.append(get_obj_obs(obs[1], goal, model.n_objects))
+            obs_goal.append(get_obj_obs(obs[1], goal, model.n_objects[0]))
             if normalizer[1] is not None:
-                for i_object in range(model.n_objects):
+                for i_object in range(model.n_objects[0]):
                     obs_goal[1][:,:,i_object] = normalizer[1].preprocess(obs_goal[1][:,:,i_object])
 
-        action = model.select_action(obs_goal[0], noise).cpu().numpy()
+        obs_goal.append(get_rob_obs(get_obj_obs(obs[0], goal, model.n_objects[0])[:,:,0:model.n_objects[1]], model.n_objects[1]))
+        if normalizer[2] is not None:
+            obs_goal[2] = normalizer[2].preprocess(obs_goal[2])
+
+        action_tensor = model.select_action(obs_goal[0], noise)
+        action = action_tensor.cpu().numpy()
 
         action_to_env = np.zeros((len(action), len(env.action_space.sample())))
         action_to_env[:,0:action.shape[1]] = action
@@ -269,26 +273,32 @@ def rollout(env, model, noise, config, normalizer=None, render=False,):
         if normalizer[0] is not None:
             next_obs_goal[0] = normalizer[0].preprocess(next_obs_goal[0])
 
-        if model.n_objects <= 1:
+        if model.n_objects[0] <= 1:
             next_obs_goal.append(K.cat([next_obs[1], goal], dim=-1))
             if normalizer[1] is not None:
                 next_obs_goal[1] = normalizer[1].preprocess(next_obs_goal[1])
         else:
-            next_obs_goal.append(get_obj_obs(next_obs[1], goal, model.n_objects))
+            next_obs_goal.append(get_obj_obs(next_obs[1], goal, model.n_objects[0]))
             if normalizer[1] is not None:
-                for i_object in range(model.n_objects):
+                for i_object in range(model.n_objects[0]):
                     next_obs_goal[1][:,:,i_object] = normalizer[1].preprocess(next_obs_goal[1][:,:,i_object])
+
+        next_obs_goal.append(get_rob_obs(get_obj_obs(next_obs[0], goal, model.n_objects[0])[:,:,0:model.n_objects[1]], model.n_objects[1]))
+        if normalizer[2] is not None:
+            next_obs_goal[2] = normalizer[2].preprocess(next_obs_goal[2])
 
         # for monitoring
         if model.object_Qfunc is None:            
             episode_reward += reward.squeeze(1).cpu().numpy()
         else:
-            if model.n_objects <= 1:
+            if model.n_objects[0] <= 1:
                 r_intr = model.get_obj_reward(obs_goal[1], next_obs_goal[1])        
             else:
                 r_intr = K.zeros_like(reward)
-                for i_object in range(model.n_objects):
-                    r_intr += model.get_obj_reward(obs_goal[1][:,:,i_object], next_obs_goal[1][:,:,i_object])
+                for i_object in range(model.n_objects[2], model.n_objects[0]):
+                    r_intr += model.get_obj_reward(obs_goal[1][:,:,i_object], next_obs_goal[1][:,:,i_object], index=0)
+            if len(model.object_Qfunc) > 1:
+                r_intr += model.get_obj_reward(obs_goal[2], next_obs_goal[2], index=1, action=action_tensor)
                 
             episode_reward += (r_intr + reward).squeeze(1).cpu().numpy()
 
@@ -344,8 +354,8 @@ def run(model, experiment_args, train=True):
 
     env, memory, noise, config, normalizer, _ = experiment_args
     env, test_env = env
-    if test_env is None:
-        test_env = env
+    #if test_env is None:
+    #    test_env = env
     
     N_EPISODES = config['n_episodes'] if train else config['n_episodes_test']
     N_CYCLES = config['n_cycles']
@@ -404,11 +414,14 @@ def run(model, experiment_args, train=True):
         episode_succeess_cycle = []
         rollout_per_env = N_TEST_ROLLOUTS // config['n_envs']
         for i_rollout in range(rollout_per_env):
-            render = config['render'] > 0 and i_episode % config['render'] == 0
-            _, episode_reward, success, _ = rollout(test_env, model, False, config, normalizer=normalizer, render=render)
+            render = config['render'] == 2 and i_episode % config['render'] == 0
+            _, episode_reward, success, _ = rollout(env, model, False, config, normalizer=normalizer, render=render)
                 
             episode_reward_cycle.extend(episode_reward)
             episode_succeess_cycle.extend(success)
+        for i_rollout in range(10):
+            render = config['render'] == 1 and i_episode % config['render'] == 0
+            _, _, _, _ = rollout(test_env, model, False, config, normalizer=normalizer, render=render)
         # <-- end loop: i_rollout 
             
         ### MONITORIRNG ###
