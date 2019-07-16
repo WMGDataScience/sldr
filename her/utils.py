@@ -290,9 +290,11 @@ def get_params(args=[], verbose=False):
                         choices=['True', 'False'],
                         help="Whether or not to use step reward instead of sparse")
 
-    parser.add_argument("--test_on_stack_only", default="True",
-                        choices=['True', 'False'],
-                        help="Whether or not to use stacking only test")
+    parser.add_argument('--train_stack_prob', default=0.5, type=float,
+                        help='stacking task probability during training (default: 0.5)')
+
+    parser.add_argument('--test_stack_prob', default=1.0, type=float,
+                        help='stacking task probability during testing (default: 1.0)')
 
     parser.add_argument("--train_robot_backward", default="False",
                         choices=['True', 'False'],
@@ -402,12 +404,7 @@ def get_params(args=[], verbose=False):
         args['use_step_reward_fun'] = True
     else:
         args['use_step_reward_fun'] = False
-
-    # Whether or not to use step reward instead of sparse
-    if args['test_on_stack_only'] == 'False':
-        args['test_on_stack_only'] = False
-    else:
-        args['test_on_stack_only'] = True
+        
 
     if args['train_robot_backward'] == 'False':
         args['train_robot_backward'] = False
