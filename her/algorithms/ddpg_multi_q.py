@@ -189,19 +189,21 @@ class DDPG_BD(object):
         s, s_, a = (s1, s1_, a1) if self.agent_id == 0 else (s2, s2_, a2)
         a_ = self.actors_target[0](s_)
     
+        r_all = []
         if self.object_Qfunc is None:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
+            r_all.append(r)
         else:
             r = K.tensor(batch['r'], dtype=self.dtype, device=self.device).unsqueeze(1)
-            r_intr = []
+            r_all.append(r)
             for i_object in range(self.n_objects):
-                r_intr.append(self.get_obj_reward(s2[:,:,i_object], s2_[:,:,i_object]))
+                r_all.append(self.get_obj_reward(s2[:,:,i_object], s2_[:,:,i_object]))
 
         # first critic for main rewards
         Q = self.critics[0](s, a)       
         V = self.critics_target[0](s_, a_).detach()
 
-        target_Q = (V * self.gamma) + r
+        target_Q = (V * self.gamma) + r_all[0]
         target_Q = target_Q.clamp(self.clip_Q_neg, 0.)
 
         loss_critic = self.loss_func(Q, target_Q)
@@ -215,7 +217,7 @@ class DDPG_BD(object):
             Q = self.critics[i_object+1](s, a)       
             V = self.critics_target[i_object+1](s_, a_).detach()
 
-            target_Q = (V * self.gamma) + r_intr[i_object]
+            target_Q = (V * self.gamma) + r_all[i_object+1]
             target_Q = target_Q.clamp(self.clip_Q_neg, 0.)
 
             loss_critic = self.loss_func(Q, target_Q)
