@@ -24,15 +24,9 @@ dtype = K.float32
 
 exp_config = get_exp_params(sys.argv[1:])
 
-if exp_config['env'] == 'Push':
-     env_name_list = ['FetchPushMulti-v1']
-elif exp_config['env'] == 'PnP':
-     env_name_list = ['FetchPickAndPlaceMulti-v1']
-elif exp_config['env'] == 'Slide':
-     env_name_list = ['FetchSlideMulti-v1']
-elif exp_config['env'] == 'All':
-     env_name_list = ['FetchPushMulti-v1', 'FetchPickAndPlaceMulti-v1', 'FetchSlideMulti-v1']
-
+env_name_list = ['FetchPickAndPlaceFlexMulti-v1']
+n_objects = int(exp_config['env'])
+n_episodes = (n_objects - 2) * 100
 
 for env_name in env_name_list:
 
@@ -63,7 +57,7 @@ for env_name in env_name_list:
                     '--n_batches', '40',
                     '--batch_size', '4864',
                     '--obj_action_type', '0123456',
-                    '--max_nb_objects', '1',
+                    '--max_nb_objects', str(n_objects),
                     '--observe_obj_grp', 'False',
                     '--rob_policy', '02',
                     ]
@@ -76,12 +70,10 @@ for env_name in env_name_list:
             env, memory, noise, config, normalizer, agent_id = experiment_args
 
             #loading the object model
-            if env_name == 'FetchPushMulti-v1':
-                path = './models_paper/obj/obj_push_7d_20ep/'
-            elif env_name == 'FetchPickAndPlaceMulti-v1':
-                path = './models_paper/obj/obj_pnp_7d_20ep/'
-            elif env_name == 'FetchSlideMulti-v1':
-                path = './models_paper/obj/obj_slide_7d_20ep/'
+            if n_objects == 3:
+                path = './models_paper/obj/flex3_7d_20ep/'   
+            elif n_objects == 5:
+                path = './models_paper/obj/flex5_7d_50ep/'
 
             print('loading object model')
             print(path)
@@ -119,7 +111,7 @@ for env_name in env_name_list:
                 '--verbose', '2',
                 '--render', '0',
                 '--gamma', '0.98',
-                '--n_episodes', '50',
+                '--n_episodes', str(n_episodes),
                 '--n_cycles', '50',
                 '--n_rollouts', '38',
                 '--n_test_rollouts', '380',
@@ -127,7 +119,7 @@ for env_name in env_name_list:
                 '--n_batches', '40',
                 '--batch_size', '4864',
                 '--obj_action_type', '0123456',
-                '--max_nb_objects', '1',
+                '--max_nb_objects', str(n_objects),
                 '--observe_obj_grp', 'False',
                 ]
 
@@ -144,7 +136,7 @@ for env_name in env_name_list:
 
         monitor2, bestmodel = run_2(model2, experiment_args2, train=True)
 
-        rob_name = env_name
+        rob_name = env_name + '_' + str(n_objects)
         if obj_rew:
             if use_her:
                 rob_name = rob_name + '_DDPG_OURS_HER_'
