@@ -126,7 +126,10 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
             '--max_nb_objects', str(n_objects),
             '--observe_obj_grp', 'False',
             '--change_stack_order', exp_config['change_stack_order'],
-            '--use_step_reward_fun', exp_config['use_step_reward_fun']  
+            '--use_step_reward_fun', exp_config['use_step_reward_fun'],  
+            '--train_robot_backward', 'False',
+            '--train_stack_prob', '0.5',
+            '--test_stack_prob', '1',
             ]
 
     config2 = get_params(args=exp_args2)
@@ -143,6 +146,7 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
     monitor2, bestmodel = run_2(model2, experiment_args2, train=True)
 
     rob_name = env_name
+    rob_name = rob_name + '_Stacking_'
     if obj_rew:
         if use_her:
             rob_name = rob_name + '_DDPG_OURS_HER_'
