@@ -38,6 +38,10 @@ elif ENV == 'Pen':
      env_name_0 = 'HandManipulatePenRotateXYZMulti-v0'
      env_name_1 = 'HandManipulatePenTranslateMulti-v0'
      env_name_2 = 'HandManipulatePenFullMulti-v0'
+elif ENV == 'PenDense':
+     env_name_0 = 'HandManipulatePenRotateXYZMultiDense-v0'
+     env_name_1 = 'HandManipulatePenTranslateMultiDense-v0'
+     env_name_2 = 'HandManipulatePenFullMultiDense-v0'
 
 if exp_config['use_her'] == 'True':
     use_her = True
@@ -211,7 +215,7 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
             rob_name = rob_name + '_DDPG_'
 
 
-    path = './models_paper/batch2/' + rob_name + str(i_exp) + '_098_100'
+    path = './models_paper/batch3/' + rob_name + str(i_exp) + '_098_100'
     try:  
         os.makedirs(path)
     except OSError:  
@@ -231,6 +235,6 @@ for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         with open(path + '/normalizer_best.pkl', 'wb') as file:
             pickle.dump(bestmodel[2], file)
 
-    path = './monitors_paper/batch2/monitor_' + rob_name  + str(i_exp) + '_098_100' + '.npy'
+    path = './monitors_paper/batch3/monitor_' + rob_name  + str(i_exp) + '_098_100' + '.npy'
     np.save(path, monitor_2)
 
