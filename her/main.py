@@ -78,12 +78,14 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     elif 'HandManipulate' in ENV_NAME and 'Multi' in ENV_NAME:
         dummy_env = gym.make(ENV_NAME, obj_action_type=config['obj_action_type'])
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Hand', agent == 'object') for i_env in range(N_ENVS)])
+        envs_test = None
         n_rob_actions = 20
         n_actions = 1 * len(config['obj_action_type']) + n_rob_actions
         #n_actions = 1 * 4 + n_rob_actions
     else:
         dummy_env = gym.make(ENV_NAME)
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Others', agent == 'object') for i_env in range(N_ENVS)])
+        envs_test = None
 
     def her_reward_fun(ag_2, g, info):  # vectorized
         return dummy_env.compute_reward(achieved_goal=ag_2, desired_goal=g, info=info)
@@ -401,7 +403,7 @@ def run(model, experiment_args, train=True):
             episode_succeess_cycle.extend(success)
             episode_distance_cycle.extend(distance)
         for i_rollout in range(10):
-            render = config['render'] == 1 and i_episode % config['render'] == 0
+            render = config['render'] == 1 and i_episode % config['render'] == 0 and env_test is not None
             _, _, _, _ = rollout(env_test, model, False, config, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
         # <-- end loop: i_rollout 
             
