@@ -402,9 +402,11 @@ def run(model, experiment_args, train=True):
             episode_reward_cycle.extend(episode_reward)
             episode_succeess_cycle.extend(success)
             episode_distance_cycle.extend(distance)
-        for i_rollout in range(10):
-            render = (config['render'] == 1) and (i_episode % config['render'] == 0) and (env_test is not None)
-            _, _, _, _ = rollout(env_test, model, False, config, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
+
+        render = (config['render'] == 1) and (i_episode % config['render'] == 0) and (env_test is not None)
+        if render:
+            for i_rollout in range(10):
+                _, _, _, _ = rollout(env_test, model, False, config, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
         # <-- end loop: i_rollout 
             
         ### MONITORIRNG ###
