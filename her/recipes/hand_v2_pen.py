@@ -124,7 +124,7 @@ for env_name in env_name_list:
                 '--render', '0',
                 '--gamma', '0.98',
                 '--clip_Q_neg', '-100',
-                '--n_episodes', '200',
+                '--n_episodes', '100',
                 '--n_cycles', '50',
                 '--n_rollouts', '38',
                 '--n_test_rollouts', '380',
