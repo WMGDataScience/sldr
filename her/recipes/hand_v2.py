@@ -30,6 +30,8 @@ elif exp_config['env'] == 'Block':
      env_name_list = ['HandManipulateBlockRotateXYZMulti-v0']
 elif exp_config['env'] == 'All':
      env_name_list = ['HandManipulateEggRotateMulti-v0', 'HandManipulateBlockRotateXYZMulti-v0']
+elif exp_config['env'] == 'AllDense':
+     env_name_list = ['HandManipulateEggRotateMultiDense-v0', 'HandManipulateBlockRotateXYZMultiDense-v0']
 
 for env_name in env_name_list:
 
@@ -153,7 +155,7 @@ for env_name in env_name_list:
                 rob_name = rob_name + '_DDPG_'
 
 
-        path = './models_paper/batch2/' + rob_name + str(i_exp)
+        path = './models_paper/batch3/' + rob_name + str(i_exp)
         try:  
             os.makedirs(path)
         except OSError:  
@@ -178,6 +180,6 @@ for env_name in env_name_list:
         with open(path + '/normalizer_best.pkl', 'wb') as file:
             pickle.dump(bestmodel[2], file)
 
-        path = './monitors_paper/batch2/monitor_' + rob_name + str(i_exp) + '.npy'
+        path = './monitors_paper/batch3/monitor_' + rob_name + str(i_exp) + '.npy'
         np.save(path, monitor2)
 
