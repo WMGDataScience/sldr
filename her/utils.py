@@ -653,6 +653,7 @@ def get_exp_params(args=[], verbose=False):
     parser.add_argument("--start_n_exp")
     parser.add_argument("--change_stack_order")
     parser.add_argument("--use_step_reward_fun")
+    parser.add_argument("--shaped")
 
     # acquire in a dict
     config = parser.parse_args(args)

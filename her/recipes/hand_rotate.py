@@ -24,17 +24,21 @@ dtype = K.float32
 
 exp_config = get_exp_params(sys.argv[1:])
 
-if exp_config['env'] == 'Egg':
-     env_name_list = ['HandManipulateEggRotateMulti-v0']
-elif exp_config['env'] == 'Block':
-     env_name_list = ['HandManipulateBlockRotateXYZMulti-v0']
-elif exp_config['env'] == 'Pen':
-     env_name_list = ['HandManipulatePenRotateMulti-v0']
-elif exp_config['env'] == 'PenDense':
-     env_name_list = ['HandManipulatePenRotateMultiDense-v0']
-elif exp_config['env'] == 'All':
-     env_name_list = ['HandManipulateEggRotateMulti-v0', 'HandManipulateBlockRotateXYZMulti-v0', 'HandManipulatePenRotateMulti-v0']
+if exp_config['shaped'] == 'True':
+    use_dist = True
+else:
+    use_dist = False
 
+suffix = 'Dense' if use_dist else ''
+
+if exp_config['env'] == 'Egg':
+     env_name_list = ['HandManipulateEggRotateMulti{}-v0'.format(suffix)]
+elif exp_config['env'] == 'Block':
+     env_name_list = ['HandManipulateBlockRotateXYZMulti{}-v0'.format(suffix)]
+elif exp_config['env'] == 'Pen':
+     env_name_list = ['HandManipulatePenRotateMulti{}-v0'.format(suffix)]
+elif exp_config['env'] == 'All':
+     env_name_list = ['HandManipulateEggRotateMulti{}-v0'.format(suffix), 'HandManipulateBlockRotateXYZMulti{}-v0'.format(suffix), 'HandManipulatePenRotateMulti{}-v0'.format(suffix)]
 
 if exp_config['use_her'] == 'True':
     use_her = True
@@ -49,6 +53,13 @@ for env_name in env_name_list:
             print("training with HER")
         else:
             print("training without HER")
+
+        if env_name.replace('Dense','') == 'HandManipulatePenRotateMulti-v0':
+            gamma = 0.98
+            clip_Q_neg = -100
+        else:
+            gamma = 0.99
+            clip_Q_neg = -100
 
         if exp_config['obj_rew'] == 'True':
         ####################### loading object ###########################
@@ -81,11 +92,11 @@ for env_name in env_name_list:
             env, memory, noise, config, normalizer, agent_id = experiment_args
 
             #loading the object model
-            if env_name == 'HandManipulateEggRotateMulti-v0':
+            if env_name.replace('Dense','') == 'HandManipulateEggRotateMulti-v0':
                 path = './models_paper/obj/egg_rotate_7d_50ep/'
-            elif env_name == 'HandManipulateBlockRotateXYZMulti-v0':
+            elif env_name.replace('Dense','') == 'HandManipulateBlockRotateXYZMulti-v0':
                 path = './models_paper/obj/block_rotate_7d_50ep/'
-            elif env_name == 'HandManipulatePenRotateMulti-v0':
+            elif env_name.replace('Dense','') == 'HandManipulatePenRotateMulti-v0':
                 path = './models_paper/obj/pen_rotate_7d_50ep/'
 
             print('loading object model')
@@ -122,7 +133,7 @@ for env_name in env_name_list:
                 '--agent_alg', model_name,
                 '--verbose', '2',
                 '--render', '0',
-                '--gamma', '0.98',
+                '--gamma', str(gamma),
                 '--clip_Q_neg', '-100',
                 '--n_episodes', '100',
                 '--n_cycles', '50',
@@ -149,7 +160,7 @@ for env_name in env_name_list:
 
         monitor2, bestmodel = run_2(model2, experiment_args2, train=True)
 
-        rob_name = env_name
+        rob_name = env_name.replace('Dense','')
         if obj_rew:
             if use_her:
                 rob_name = rob_name + '_DDPG_OURS_HER_'
@@ -161,8 +172,11 @@ for env_name in env_name_list:
             else:
                 rob_name = rob_name + '_DDPG_'
 
+        if use_dist:
+            rob_name = rob_name + 'DIST_'
 
-        path = './models_paper/batch3/' + rob_name + str(i_exp) + '_098_100'
+        path = './models_paper/batch3/' + rob_name + str(i_exp)
+
         try:  
             os.makedirs(path)
         except OSError:  
@@ -187,6 +201,6 @@ for env_name in env_name_list:
         with open(path + '/normalizer_best.pkl', 'wb') as file:
             pickle.dump(bestmodel[2], file)
 
-        path = './monitors_paper/batch3/monitor_' + rob_name  + str(i_exp) + '_098_100' + '.npy'
+        path = './models_paper/batch3/monitor_' + rob_name  + str(i_exp) + '.npy'
         np.save(path, monitor2)
 
