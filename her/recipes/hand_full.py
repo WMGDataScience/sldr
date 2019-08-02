@@ -214,7 +214,7 @@ for i_env in range(len(env_name_0)):
 
         monitor_2, bestmodel = run_2(model_2, experiment_args_2, train=True)
 
-        rob_name = env_name_2[i_env]
+        rob_name = env_name_2[i_env].replace('Dense','')
         if obj_rew:
             if use_her:
                 rob_name = rob_name + '_DDPG_OURS_HER_'
