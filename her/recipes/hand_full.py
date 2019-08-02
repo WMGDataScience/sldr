@@ -24,45 +24,55 @@ device = K.device("cuda" if K.cuda.is_available() else "cpu")
 dtype = K.float32
 
 exp_config = get_exp_params(sys.argv[1:])
+
 ENV = exp_config['env']
 
-if ENV == 'Egg':
-     env_name_0 = ['HandManipulateEggRotateMulti-v0']
-     env_name_1 = ['HandManipulateEggTranslateMulti-v0']
-     env_name_2 = ['HandManipulateEggFullMulti-v0']
-elif ENV == 'Block':
-     env_name_0 = ['HandManipulateBlockRotateXYZMulti-v0']
-     env_name_1 = ['HandManipulateBlockTranslateMulti-v0']
-     env_name_2 = ['HandManipulateBlockFullMulti-v0']
-elif ENV == 'Pen':
-     env_name_0 = ['HandManipulatePenRotateXYZMulti-v0']
-     env_name_1 = ['HandManipulatePenTranslateMulti-v0']
-     env_name_2 = ['HandManipulatePenFullMulti-v0']
-elif ENV == 'All':
-     env_name_0 = ['HandManipulateEggRotateMulti-v0', 'HandManipulateBlockRotateXYZMulti-v0']
-     env_name_1 = ['HandManipulateEggTranslateMulti-v0', 'HandManipulateBlockTranslateMulti-v0']
-     env_name_2 = ['HandManipulateEggFullMulti-v0', 'HandManipulateBlockFullMulti-v0']
-elif ENV == 'AllDense':
-     env_name_0 = ['HandManipulateEggRotateMultiDense-v0', 'HandManipulateBlockRotateXYZMultiDense-v0']
-     env_name_1 = ['HandManipulateEggTranslateMultiDense-v0', 'HandManipulateBlockTranslateMultiDense-v0']
-     env_name_2 = ['HandManipulateEggFullMultiDense-v0', 'HandManipulateBlockFullMultiDense-v0']
+if exp_config['shaped'] == 'True':
+    use_dist = True
+else:
+    use_dist = False
 
+suffix = 'Dense' if use_dist else ''
+
+if ENV == 'Egg':
+     env_name_0 = ['HandManipulateEggRotateMulti{}-v0'.format(suffix)]
+     env_name_1 = ['HandManipulateEggTranslateMulti{}-v0'.format(suffix)]
+     env_name_2 = ['HandManipulateEggFullMulti{}-v0'.format(suffix)]
+elif ENV == 'Block':
+     env_name_0 = ['HandManipulateBlockRotateXYZMulti{}-v0'.format(suffix)]
+     env_name_1 = ['HandManipulateBlockTranslateMulti{}-v0'.format(suffix)]
+     env_name_2 = ['HandManipulateBlockFullMulti{}-v0'.format(suffix)]
+elif ENV == 'Pen':
+     env_name_0 = ['HandManipulatePenRotateXYZMulti{}-v0'.format(suffix)]
+     env_name_1 = ['HandManipulatePenTranslateMulti{}-v0'.format(suffix)]
+     env_name_2 = ['HandManipulatePenFullMulti{}-v0'.format(suffix)]
+elif ENV == 'All':
+     env_name_0 = ['HandManipulateEggRotateMulti{}-v0'.format(suffix), 'HandManipulateBlockRotateXYZMulti{}-v0'.format(suffix), 'HandManipulatePenRotateXYZMulti{}-v0'.format(suffix)]
+     env_name_1 = ['HandManipulateEggTranslateMulti{}-v0'.format(suffix), 'HandManipulateBlockTranslateMulti{}-v0'.format(suffix), 'HandManipulatePenTranslateMulti{}-v0'.format(suffix)]
+     env_name_2 = ['HandManipulateEggFullMulti{}-v0'.format(suffix), 'HandManipulateBlockFullMulti{}-v0'.format(suffix), 'HandManipulatePenFullMulti{}-v0'.format(suffix)]
+
+
+if exp_config['use_her'] == 'True':
+    use_her = True
+    print("training with HER")
+else:
+    use_her = False
+    print("training without HER")
+
+model_name = 'DDPG_BD'
 
 for i_env in range(len(env_name_0)):
 
-    if exp_config['use_her'] == 'True':
-        use_her = True
-        print("training with HER")
+    if env_name_0[i_env].replace('Dense','') == 'HandManipulatePenRotateXYZMulti-v0':
+        gamma = 0.98
+        clip_Q_neg = -100
     else:
-        use_her = False
-        print("training without HER")
-
-    model_name = 'DDPG_BD'
+        gamma = 0.99
+        clip_Q_neg = -100
 
     for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         if exp_config['obj_rew'] == 'True':
         ####################### loading object ###########################
-
             exp_args_0 = ['--env_id', env_name_0[i_env],
                     '--exp_id', model_name + '_fooobj_' + str(0),
                     '--random_seed', str(0), 
@@ -90,11 +100,11 @@ for i_env in range(len(env_name_0)):
             env_0, memory_0, noise_0, config_0, normalizer_0, agent_id_0 = experiment_args_0
 
             #loading the object model
-            if ENV == 'Egg':
+            if env_name_0[i_env].replace('Dense','') == 'HandManipulateEggRotateMulti-v0':
                 path = './models_paper/obj/egg_rotate_7d_50ep/'
-            elif ENV == 'Block':
+            elif env_name_0[i_env].replace('Dense','') == 'HandManipulateBlockRotateXYZMulti-v0':
                 path = './models_paper/obj/block_rotate_7d_50ep/'
-            elif ENV == 'Pen':
+            elif env_name_0[i_env].replace('Dense','') == 'HandManipulatePenRotateXYZMulti-v0':
                 path = './models_paper/obj/pen_rotate_7d_50ep/'
 
             print('loading object model for rotation')
@@ -135,11 +145,11 @@ for i_env in range(len(env_name_0)):
             env_1, memory_1, noise_1, config_1, normalizer_1, agent_id_1 = experiment_args_1
 
             #loading the object model
-            if ENV == 'Egg':
+            if env_name_0[i_env].replace('Dense','') == 'HandManipulateEggRotateMulti-v0':
                 path = './models_paper/obj/egg_translate_7d_20ep/'
-            elif ENV == 'Block':
+            elif env_name_0[i_env].replace('Dense','') == 'HandManipulateBlockRotateXYZMulti-v0':
                 path = './models_paper/obj/block_translate_7d_20ep/'
-            elif ENV == 'Pen':
+            elif env_name_0[i_env].replace('Dense','') == 'HandManipulatePenRotateXYZMulti-v0':
                 path = './models_paper/obj/pen_translate_7d_20ep/'
 
             print('loading object model for translation')
@@ -176,7 +186,8 @@ for i_env in range(len(env_name_0)):
                 '--agent_alg', model_name,
                 '--verbose', '2',
                 '--render', '0',
-                '--gamma', '0.99',
+                '--gamma', str(gamma),
+                '--clip_Q_neg', '-100',
                 '--n_episodes', '200',
                 '--n_cycles', '50',
                 '--n_rollouts', '38',
@@ -215,6 +226,8 @@ for i_env in range(len(env_name_0)):
             else:
                 rob_name = rob_name + '_DDPG_'
 
+        if use_dist:
+            rob_name = rob_name + 'DIST_'
 
         path = './models_paper/batch3/' + rob_name + str(i_exp)
         try:  
@@ -236,6 +249,6 @@ for i_env in range(len(env_name_0)):
             with open(path + '/normalizer_best.pkl', 'wb') as file:
                 pickle.dump(bestmodel[2], file)
 
-        path = './monitors_paper/batch3/monitor_' + rob_name  + '_' + str(i_exp) + '.npy'
+        path = './models_paper/batch3/monitor_' + rob_name + str(i_exp) + '.npy'
         np.save(path, monitor_2)
 
