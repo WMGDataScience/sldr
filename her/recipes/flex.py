@@ -17,6 +17,8 @@ import sys
 K.set_num_threads(1)
 
 filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
+#filepath='/home/ok18/Jupyter/notebooks/Reinforcement_Learning/'
+
 os.chdir(filepath)
 
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
@@ -24,7 +26,14 @@ dtype = K.float32
 
 exp_config = get_exp_params(sys.argv[1:])
 
-env_name_list = ['FetchPickAndPlaceFlexMulti-v1']
+if exp_config['shaped'] == 'True':
+    use_dist = True
+else:
+    use_dist = False
+
+suffix = 'Dense' if use_dist else ''
+
+env_name_list = ['FetchPickAndPlaceFlexMulti{}-v1'.format(suffix)]
 n_objects = int(exp_config['env'])
 n_episodes = (n_objects - 2) * 100
 
@@ -136,7 +145,7 @@ for env_name in env_name_list:
 
         monitor2, bestmodel = run_2(model2, experiment_args2, train=True)
 
-        rob_name = env_name + '_' + str(n_objects)
+        rob_name = env_name.replace('Dense','')  + '_' + str(n_objects)
         if obj_rew:
             if use_her:
                 rob_name = rob_name + '_DDPG_OURS_HER_'
@@ -148,8 +157,10 @@ for env_name in env_name_list:
             else:
                 rob_name = rob_name + '_DDPG_'
 
+        if use_dist:
+            rob_name = rob_name + 'DIST_'
 
-        path = './models_paper/batch2/' + rob_name + '_' + str(i_exp)
+        path = './models_paper/batch3/' + rob_name + str(i_exp)
         try:  
             os.makedirs(path)
         except OSError:  
@@ -174,6 +185,6 @@ for env_name in env_name_list:
         with open(path + '/normalizer_best.pkl', 'wb') as file:
             pickle.dump(bestmodel[2], file)
 
-        path = './monitors_paper/batch2/monitor_' + rob_name  + '_' + str(i_exp) + '.npy'
+        path = './models_paper/batch3/monitor_' + rob_name  + str(i_exp) + '.npy'
         np.save(path, monitor2)
 
