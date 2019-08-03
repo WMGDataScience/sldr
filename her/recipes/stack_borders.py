@@ -37,7 +37,7 @@ suffix = 'Dense' if use_dist else ''
 #n_objects = int(exp_config['env'])
 for n_objects in range(2,4):
     n_episodes = (n_objects - 1) * 100
-    env_name = 'FetchStackBordersMulti{}-v1'.format(suffix)
+    env_name = 'FetchStackBordersMulti{}{}-v1'.format(suffix, n_objects)
     print(env_name)
 
     if exp_config['use_her'] == 'True':
