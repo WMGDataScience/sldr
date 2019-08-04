@@ -34,8 +34,14 @@ else:
 
 suffix = 'Dense' if use_dist else ''
 
-#n_objects = int(exp_config['env'])
-for n_objects in range(2,4):
+if exp_config['env'] == 'All':
+    n_objects_lower = 2
+    n_objects_higher = 4
+else:
+    n_objects_lower = int(exp_config['env'])
+    n_objects_higher = int(exp_config['env']) + 1
+
+for n_objects in range(n_objects_lower,n_objects_higher):
     n_episodes = (n_objects - 1) * 100
     env_name = 'FetchStackBordersMulti{}{}-v1'.format(suffix, n_objects)
     print(env_name)
