@@ -329,6 +329,7 @@ class ForwardDynReg(nn.Module):
 
         return p
 
+
 class AutoEncReg(nn.Module):
     def __init__(self, observation_space, action_space):
         super(AutoEncReg, self).__init__()
