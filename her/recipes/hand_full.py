@@ -8,6 +8,8 @@ from her.utils import get_params as get_params, running_mean, get_exp_params
 from her.main import init, run
 from her.main_q_rt import init as init_q
 from her.main_q_rt import run as run_q
+from her.main_q_rnd import init as init_q_rnd
+from her.main_q_rnd import run as run_q_rnd
 import matplotlib.pyplot as plt
 
 import os
@@ -58,6 +60,11 @@ if exp_config['use_her'] == 'True':
 else:
     use_her = False
     print("training without HER")
+
+if exp_config['use_rnd'] == 'True':
+    use_rnd = True
+else:
+    use_rnd = False
 
 model_name = 'DDPG_BD'
 
@@ -175,9 +182,14 @@ for i_env in range(len(env_name_0)):
             object_Qfunc = None
             object_policy = None  
             backward_dyn = None
-            init_2 = init
-            run_2 = run
             print("training without object based rewards")
+            if use_rnd:
+                init_2 = init_q_rnd
+                run_2 = run_q_rnd
+                print("training with RND rewards")
+            else:
+                init_2 = init
+                run_2 = run
 
         ####################### training robot ###########################  
         exp_args_2=['--env_id', env_name_2[i_env],
@@ -225,6 +237,9 @@ for i_env in range(len(env_name_0)):
                 rob_name = rob_name + '_DDPG_HER_'
             else:
                 rob_name = rob_name + '_DDPG_'
+
+        if use_rnd:
+            rob_name = rob_name + 'RND_'
 
         if use_dist:
             rob_name = rob_name + 'DIST_'
