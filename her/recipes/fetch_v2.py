@@ -8,6 +8,8 @@ from her.utils import get_params as get_params, running_mean, get_exp_params
 from her.main import init, run
 from her.main_q import init as init_q
 from her.main_q import run as run_q
+from her.main_q_rnd import init as init_q_rnd
+from her.main_q_rnd import run as run_q_rnd
 import matplotlib.pyplot as plt
 
 import os
@@ -17,6 +19,7 @@ import sys
 K.set_num_threads(1)
 
 filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
+#filepath='/home/ok18/Jupyter/notebooks/Reinforcement_Learning/'
 os.chdir(filepath)
 
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
@@ -24,15 +27,21 @@ dtype = K.float32
 
 exp_config = get_exp_params(sys.argv[1:])
 
-if exp_config['env'] == 'Push':
-     env_name_list = ['FetchPushMulti-v1']
-elif exp_config['env'] == 'PnP':
-     env_name_list = ['FetchPickAndPlaceMulti-v1']
-elif exp_config['env'] == 'Slide':
-     env_name_list = ['FetchSlideMulti-v1']
-elif exp_config['env'] == 'All':
-     env_name_list = ['FetchPushMulti-v1', 'FetchPickAndPlaceMulti-v1', 'FetchSlideMulti-v1']
+if exp_config['shaped'] == 'True':
+    use_dist = True
+else:
+    use_dist = False
 
+suffix = 'Dense' if use_dist else ''
+
+if exp_config['env'] == 'Push':
+     env_name_list = ['FetchPushMulti{}-v1'.format(suffix)]
+elif exp_config['env'] == 'PnP':
+     env_name_list = ['FetchPickAndPlaceMulti{}-v1'.format(suffix)]
+elif exp_config['env'] == 'Slide':
+     env_name_list = ['FetchSlideMulti{}-v1'.format(suffix)]
+elif exp_config['env'] == 'All':
+     env_name_list = ['FetchPushMulti{}-v1'.format(suffix), 'FetchPickAndPlaceMulti{}-v1'.format(suffix), 'FetchSlideMulti{}-v1'.format(suffix)]
 
 for env_name in env_name_list:
 
@@ -42,6 +51,11 @@ for env_name in env_name_list:
     else:
         use_her = False
         print("training without HER")
+
+    if exp_config['use_rnd'] == 'True':
+        use_rnd = True
+    else:
+        use_rnd = False
 
     for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         if exp_config['obj_rew'] == 'True':
@@ -106,9 +120,14 @@ for env_name in env_name_list:
             object_Qfunc = None
             object_policy = None  
             backward_dyn = None
-            init_2 = init
-            run_2 = run
             print("training without object based rewards")
+            if use_rnd:
+                init_2 = init_q_rnd
+                run_2 = run_q_rnd
+                print("training with RND rewards")
+            else:
+                init_2 = init
+                run_2 = run
 
         ####################### training robot ###########################  
         model_name = 'DDPG_BD'
@@ -157,7 +176,13 @@ for env_name in env_name_list:
                 rob_name = rob_name + '_DDPG_'
 
 
-        path = './models_paper/batch2/' + rob_name + '_' + str(i_exp)
+        if use_rnd:
+            rob_name = rob_name + 'RND_'
+
+        if use_dist:
+            rob_name = rob_name + 'DIST_'
+
+        path = './models_paper/batch3/' + rob_name + str(i_exp)
         try:  
             os.makedirs(path)
         except OSError:  
@@ -182,6 +207,6 @@ for env_name in env_name_list:
         with open(path + '/normalizer_best.pkl', 'wb') as file:
             pickle.dump(bestmodel[2], file)
 
-        path = './monitors_paper/batch2/monitor_' + rob_name  + '_' + str(i_exp) + '.npy'
+        path = './models_paper/batch3/monitor_' + rob_name + str(i_exp) + '.npy'
         np.save(path, monitor2)
 
