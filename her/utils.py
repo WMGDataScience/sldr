@@ -654,6 +654,7 @@ def get_exp_params(args=[], verbose=False):
     parser.add_argument("--change_stack_order")
     parser.add_argument("--use_step_reward_fun")
     parser.add_argument("--shaped")
+    parser.add_argument("--use_rnd")
 
     # acquire in a dict
     config = parser.parse_args(args)
