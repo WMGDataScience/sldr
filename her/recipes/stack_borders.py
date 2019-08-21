@@ -10,6 +10,8 @@ from her.main_multi import init as init_multi
 from her.main_multi import run as run_multi
 from her.main_multi_q import init as init_q
 from her.main_multi_q import run as run_q
+from her.main_multi_q_rnd import init as init_q_rnd
+from her.main_multi_q_rnd import run as run_q_rnd
 import matplotlib.pyplot as plt
 
 import os
@@ -50,6 +52,11 @@ for n_objects in range(n_objects_lower,n_objects_higher):
         use_her = True
     else:
         use_her = False
+
+    if exp_config['use_rnd'] == 'True':
+        use_rnd = True
+    else:
+        use_rnd = False
 
     for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
 
@@ -110,14 +117,18 @@ for n_objects in range(n_objects_lower,n_objects_higher):
             run_2 = run_q
         ####################### loading object ###########################
         elif exp_config['obj_rew'] == 'False':
-            print("training without object based rewards")
-
             obj_rew = False
             object_Qfunc = None
             object_policy = None  
             backward_dyn = None
-            init_2 = init_multi
-            run_2 = run_multi
+            print("training without object based rewards")
+            if use_rnd:
+                init_2 = init_q_rnd
+                run_2 = run_q_rnd
+                print("training with RND rewards")
+            else:
+                init_2 = init_multi
+                run_2 = run_multi
 
         ####################### training robot ###########################  
         model_name = 'DDPG_BD'
@@ -171,6 +182,9 @@ for n_objects in range(n_objects_lower,n_objects_higher):
                 rob_name = rob_name + '_DDPG_HER_'
             else:
                 rob_name = rob_name + '_DDPG_'
+
+        if use_rnd:
+            rob_name = rob_name + 'RND_'
 
         if use_dist:
             rob_name = rob_name + 'DIST_'
