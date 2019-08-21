@@ -11,7 +11,7 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms.ddpg_multi_q import DDPG_BD
+from her.algorithms.ddpg_q_rnd import DDPG_BD
 from her.algorithms.maddpg import MADDPG_BD
 from her.experience import Normalizer
 from her.exploration import Noise
@@ -148,14 +148,13 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
 
     #model initialization
     optimizer = (optim.Adam, (ACTOR_LR, CRITIC_LR)) # optimiser func, (actor_lr, critic_lr)
-    loss_func = F.mse_loss
+    loss_func = F.mse_loss 
     model = MODEL(observation_space, action_space, optimizer, 
                   Actor, Critic, loss_func, GAMMA, TAU, out_func=OUT_FUNC, discrete=False, 
                   regularization=REGULARIZATION, normalized_rewards=NORMALIZED_REWARDS,
                   agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
-                  object_policy=object_policy, reward_fun=reward_fun, 
-                  n_objects=config['max_nb_objects'], clip_Q_neg=clip_Q_neg)
-    normalizer = [Normalizer(), Normalizer()]
+                  object_policy=object_policy, reward_fun=reward_fun, clip_Q_neg=clip_Q_neg)
+    normalizer = [Normalizer(), Normalizer(), Normalizer()]
 
     for _ in range(1):
         state_all = dummy_env.reset()
@@ -239,15 +238,6 @@ def rollout(env, model, noise, config, normalizer=None, render=False,):
         if normalizer[0] is not None:
             obs_goal[0] = normalizer[0].preprocess_with_update(obs_goal[0])
 
-        if model.n_objects <= 1:
-            obs_goal.append(K.cat([obs[1], goal], dim=-1))            
-            if normalizer[1] is not None:
-                obs_goal[1] = normalizer[1].preprocess(obs_goal[1])
-        else:
-            obs_goal.append(get_obj_obs(obs[1], goal, model.n_objects))
-            if normalizer[1] is not None:
-                for i_object in range(model.n_objects):
-                    obs_goal[1][:,:,i_object] = normalizer[1].preprocess(obs_goal[1][:,:,i_object])
 
         action = model.select_action(obs_goal[0], noise).cpu().numpy()
 
@@ -266,28 +256,11 @@ def rollout(env, model, noise, config, normalizer=None, render=False,):
         if normalizer[0] is not None:
             next_obs_goal[0] = normalizer[0].preprocess(next_obs_goal[0])
 
-        if model.n_objects <= 1:
-            next_obs_goal.append(K.cat([next_obs[1], goal], dim=-1))
-            if normalizer[1] is not None:
-                next_obs_goal[1] = normalizer[1].preprocess(next_obs_goal[1])
-        else:
-            next_obs_goal.append(get_obj_obs(next_obs[1], goal, model.n_objects))
-            if normalizer[1] is not None:
-                for i_object in range(model.n_objects):
-                    next_obs_goal[1][:,:,i_object] = normalizer[1].preprocess(next_obs_goal[1][:,:,i_object])
 
         # for monitoring
-        if model.object_Qfunc is None:            
-            episode_reward += reward.squeeze(1).cpu().numpy()
-        else:
-            if model.n_objects <= 1:
-                r_intr = model.get_obj_reward(obs_goal[1], next_obs_goal[1])        
-            else:
-                r_intr = K.zeros_like(reward)
-                for i_object in range(model.n_objects):
-                    r_intr += model.get_obj_reward(obs_goal[1][:,:,i_object], next_obs_goal[1][:,:,i_object])
-                
-            episode_reward += (r_intr + reward).squeeze(1).cpu().numpy()
+        r_intr = model.get_obj_reward(next_obs_goal[0])
+        r_intr = normalizer[2].preprocess_with_update(r_intr)   
+        episode_reward += (r_intr + reward).squeeze(1).cpu().numpy()
 
         for i_agent in range(2):
             state = {
@@ -358,6 +331,7 @@ def run(model, experiment_args, train=True):
     actor_losses = []
     backward_losses = []
     backward_otw_losses = []
+    rnd_losses = []
 
     best_succeess = -1
         
@@ -380,10 +354,12 @@ def run(model, experiment_args, train=True):
 
                     batch = memory.sample(BATCH_SIZE)
                     critic_loss, actor_loss = model.update_parameters(batch, normalizer)
+                    rnd_loss = model.update_rnd(batch, normalizer)  
 
                     if i_batch == N_BATCHES - 1:
                         critic_losses.append(critic_loss)
                         actor_losses.append(actor_loss)
+                        rnd_losses.append(rnd_loss)
 
                 model.update_target()
 
@@ -396,6 +372,8 @@ def run(model, experiment_args, train=True):
 
             # <-- end loop: i_cycle
         plot_durations(np.asarray(critic_losses), np.asarray(actor_losses))
+
+        plot_durations(np.asarray(rnd_losses), np.asarray(rnd_losses))
 
         episode_reward_cycle = []
         episode_succeess_cycle = []
