@@ -88,7 +88,7 @@ for env_name in env_name_list:
             #loading the object model
             if n_objects == 3:
                 #path = './models_paper/obj/flex3_7d_20ep/'   
-                path = './models_paper/obj/flex3_7d_50ep_damping/'
+                path = './models_paper/obj/flex3_7d_20ep_damping/'
             elif n_objects == 5:
                 #path = './models_paper/obj/flex5_7d_50ep/'
                 path = './models_paper/obj/flex5_7d_50ep_damping/'
