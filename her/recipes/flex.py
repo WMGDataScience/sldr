@@ -8,6 +8,8 @@ from her.utils import get_params as get_params, running_mean, get_exp_params
 from her.main import init, run
 from her.main_q import init as init_q
 from her.main_q import run as run_q
+from her.main_q_rnd import init as init_q_rnd
+from her.main_q_rnd import run as run_q_rnd
 import matplotlib.pyplot as plt
 
 import os
@@ -46,6 +48,11 @@ for env_name in env_name_list:
         use_her = False
         print("training without HER")
 
+    if exp_config['use_rnd'] == 'True':
+        use_rnd = True
+    else:
+        use_rnd = False
+
     for i_exp in range(int(exp_config['start_n_exp']), int(exp_config['n_exp'])):
         if exp_config['obj_rew'] == 'True':
         ####################### loading object ###########################
@@ -80,9 +87,11 @@ for env_name in env_name_list:
 
             #loading the object model
             if n_objects == 3:
-                path = './models_paper/obj/flex3_7d_20ep/'   
+                #path = './models_paper/obj/flex3_7d_20ep/'   
+                path = './models_paper/obj/flex3_7d_50ep_damping/'
             elif n_objects == 5:
-                path = './models_paper/obj/flex5_7d_50ep/'
+                #path = './models_paper/obj/flex5_7d_50ep/'
+                path = './models_paper/obj/flex5_7d_50ep_damping/'
 
             print('loading object model')
             print(path)
@@ -107,9 +116,14 @@ for env_name in env_name_list:
             object_Qfunc = None
             object_policy = None  
             backward_dyn = None
-            init_2 = init
-            run_2 = run
             print("training without object based rewards")
+            if use_rnd:
+                init_2 = init_q_rnd
+                run_2 = run_q_rnd
+                print("training with RND rewards")
+            else:
+                init_2 = init
+                run_2 = run
 
         ####################### training robot ###########################  
         model_name = 'DDPG_BD'
@@ -156,6 +170,9 @@ for env_name in env_name_list:
                 rob_name = rob_name + '_DDPG_HER_'
             else:
                 rob_name = rob_name + '_DDPG_'
+
+        if use_rnd:
+            rob_name = rob_name + 'RND_'
 
         if use_dist:
             rob_name = rob_name + 'DIST_'
