@@ -18,14 +18,13 @@ import sys
 
 K.set_num_threads(1)
 
-filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
-#filepath='/home/ok18/Jupyter/notebooks/Reinforcement_Learning/'
-os.chdir(filepath)
 
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
 dtype = K.float32
 
 exp_config = get_exp_params(sys.argv[1:])
+filepath = exp_config['filepath'] 
+os.chdir(filepath)
 
 ENV = exp_config['env']
 
@@ -261,8 +260,8 @@ for i_env in range(len(env_name_0)):
         with open(path + '/normalizer.pkl', 'wb') as file:
             pickle.dump(normalizer_2, file)
 
-            with open(path + '/normalizer_best.pkl', 'wb') as file:
-                pickle.dump(bestmodel[2], file)
+        with open(path + '/normalizer_best.pkl', 'wb') as file:
+            pickle.dump(bestmodel[2], file)
 
         path = './models_paper/batch3/monitor_' + rob_name + str(i_exp) + '.npy'
         np.save(path, monitor_2)

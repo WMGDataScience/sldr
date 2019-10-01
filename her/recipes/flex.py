@@ -18,15 +18,12 @@ import sys
 
 K.set_num_threads(1)
 
-filepath='/jmain01/home/JAD022/grm01/oxk28-grm01/Dropbox/Jupyter/notebooks/Reinforcement_Learning/'
-#filepath='/home/ok18/Jupyter/notebooks/Reinforcement_Learning/'
-
-os.chdir(filepath)
-
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
 dtype = K.float32
 
 exp_config = get_exp_params(sys.argv[1:])
+filepath = exp_config['filepath'] 
+os.chdir(filepath)
 
 if exp_config['shaped'] == 'True':
     use_dist = True
@@ -87,11 +84,11 @@ for env_name in env_name_list:
 
             #loading the object model
             if n_objects == 3:
-                #path = './models_paper/obj/flex3_7d_20ep/'   
-                path = './models_paper/obj/flex3_7d_20ep_damping/'
+                path = './models_paper/obj/flex3_7d_20ep/'   
+                #path = './models_paper/obj/flex3_7d_20ep_damping/'
             elif n_objects == 5:
-                #path = './models_paper/obj/flex5_7d_50ep/'
-                path = './models_paper/obj/flex5_7d_50ep_damping/'
+                path = './models_paper/obj/flex5_7d_50ep/'
+                #path = './models_paper/obj/flex5_7d_50ep_damping/'
 
             print('loading object model')
             print(path)
