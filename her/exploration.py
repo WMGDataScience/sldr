@@ -52,17 +52,19 @@ class OUNoise:
 
 
 class Noise:
-    def __init__(self,action_dimension, sigma=0.2, eps=0.3, max_u=1.0):
-         self.action_dimension = action_dimension
-         self.sigma = sigma
-         self.eps = eps
-         self.max_u = max_u
+    def __init__(self,action_dimension, sigma=0.2, eps=0.3, max_u=1.0, min_u=None):
+        self.action_dimension = action_dimension
+        self.sigma = sigma
+        self.eps = eps
+        self.max_u = max_u
+        self.min_u = -max_u if min_u is None else min_u
+        
 
     def noise(self, size):
         return self.sigma*np.random.randn(*size)
 
     def random_action(self, size):
-        return np.random.uniform(low=-self.max_u, high=self.max_u, size=size)
+        return np.random.uniform(low=self.min_u , high=self.max_u, size=size)
 
     def get_noisy_action(self, x):
         size = (x.shape[0], self.action_dimension)
