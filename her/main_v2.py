@@ -36,60 +36,86 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     SEED = config['random_seed']
     N_ENVS = config['n_envs']
 
-    def make_env(env_id, i_env, env_type='Fetch', ai_object=False):
+    def make_env(env_id, i_env, env_type='Fetch', ai_object=False, stack_prob=None):
         def _f():
             if env_type == 'Fetch':
                 env = gym.make(env_id, n_objects=config['max_nb_objects'], 
                                     obj_action_type=config['obj_action_type'], 
                                     observe_obj_grp=config['observe_obj_grp'],
-                                    obj_range=config['obj_range'])
+                                    obj_range=config['obj_range'],
+                                    change_stack_order=config['change_stack_order']
+                                    )
             elif env_type == 'Hand':
                 env = gym.make(env_id, obj_action_type=config['obj_action_type'])
             elif env_type == 'Others':
                 env = gym.make(env_id)
             
+
+            #env._max_episode_steps *= config['max_nb_objects']
             keys = env.observation_space.spaces.keys()
             env = gym.wrappers.FlattenDictWrapper(env, dict_keys=list(keys))
             env.seed(SEED+10*i_env)
             env.unwrapped.ai_object = ai_object
+            if stack_prob is not None:
+                env.unwrapped.stack_prob = stack_prob
             return env
-        return _f   
+        return _f
 
-    if 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME and 'Flex' not in ENV_NAME:
+    if 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME:
         dummy_env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], 
                                     obj_action_type=config['obj_action_type'], 
                                     observe_obj_grp=config['observe_obj_grp'],
                                     obj_range=config['obj_range'])
-        envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(N_ENVS)])
-        envs_test = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(1)])
         n_rob_actions = 4
-        n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
-        #n_actions = config['max_nb_objects'] * 3 + n_rob_actions
-    elif 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME and 'Flex' in ENV_NAME:
-        dummy_env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], 
-                                    obj_action_type=config['obj_action_type'], 
-                                    observe_obj_grp=config['observe_obj_grp'],
-                                    obj_range=config['obj_range'])
-        envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(N_ENVS)])
-        envs_test = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(1)])
-        n_rob_actions = 4
-        n_actions = 2 * len(config['obj_action_type']) + n_rob_actions
-        #n_actions = config['max_nb_objects'] * 3 + n_rob_actions
+        if 'Stack' in ENV_NAME:
+            envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', config['train_stack_prob']) for i_env in range(N_ENVS)])
+            envs_test = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', config['test_stack_prob']) for i_env in range(N_ENVS)]) 
+            envs_render = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', config['render_stack_prob']) for i_env in range(1)]) 
+            n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
+        elif 'Flex' in ENV_NAME:
+            envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(N_ENVS)])
+            envs_test = None
+            envs_render = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(1)])
+            n_actions = 2 * len(config['obj_action_type']) + n_rob_actions
+        else:
+            envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(N_ENVS)])
+            envs_test = None
+            envs_render = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(1)])
+            n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
     elif 'HandManipulate' in ENV_NAME and 'Multi' in ENV_NAME:
         dummy_env = gym.make(ENV_NAME, obj_action_type=config['obj_action_type'])
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Hand', agent == 'object') for i_env in range(N_ENVS)])
         envs_test = None
+        envs_render = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Hand', agent == 'object') for i_env in range(1)])
         n_rob_actions = 20
         n_actions = 1 * len(config['obj_action_type']) + n_rob_actions
-        #n_actions = 1 * 4 + n_rob_actions
     else:
         dummy_env = gym.make(ENV_NAME)
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Others', agent == 'object') for i_env in range(N_ENVS)])
         envs_test = None
+        envs_render = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Others', agent == 'object') for i_env in range(1)]) 
 
-    def her_reward_fun(ag_2, g, info):  # vectorized
+    def her_reward_fun_sparse(ag_2, g, info):  # vectorized
         return dummy_env.compute_reward(achieved_goal=ag_2, desired_goal=g, info=info)
 
+    def her_reward_fun_step(ag_2, g, info):
+        goal_a = ag_2
+        goal_b = g
+        assert goal_a.shape == goal_b.shape
+        goal_a = goal_a.reshape(-1,dummy_env.env.n_objects,3)
+        goal_b = goal_b.reshape(-1,dummy_env.env.n_objects,3)
+        d = np.linalg.norm(goal_a - goal_b, axis=-1)
+        return -(d > dummy_env.env.distance_threshold).astype(np.float32).sum(-1)
+
+    if config['use_step_reward_fun']:
+        her_reward_fun = her_reward_fun_step
+        print('using step reward')
+    else:
+        her_reward_fun = her_reward_fun_sparse
+        print('using sparse reward')
+    
+    if config['change_stack_order']:
+        print('changing the stacking order')
 
     K.manual_seed(SEED)
     np.random.seed(SEED)
@@ -121,13 +147,8 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
         from her.her_sampler import make_sample_her_transitions_v2 as make_sample_her_transitions
 
     #exploration initialization
-    if agent == 'robot':
-        agent_id = 0
-        noise = Noise(action_space[0].shape[0], sigma=0.2, eps=0.3)
-    elif agent == 'object':
-        agent_id = 1
-        #noise = Noise(action_space[1].shape[0], sigma=0.2, eps=0.3)    
-        noise = Noise(action_space[1].shape[0], sigma=0.05, eps=0.2)   
+    noise = (Noise(action_space[0].shape[0], sigma=0.2, eps=0.3), 
+             Noise(action_space[1].shape[0], sigma=0.05, eps=0.2))
     config['episode_length'] = dummy_env._max_episode_steps
     config['observation_space'] = dummy_env.observation_space
 
@@ -137,9 +158,10 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     model = MODEL(observation_space, action_space, optimizer, 
                   Actor, Critic, loss_func, GAMMA, TAU, out_func=OUT_FUNC, discrete=False, 
                   regularization=REGULARIZATION, normalized_rewards=NORMALIZED_REWARDS,
-                  agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
-                  object_policy=object_policy, reward_fun=reward_fun, masked_with_r=config['masked_with_r'], clip_Q_neg=clip_Q_neg)
-    normalizer = [Normalizer(), Normalizer()]
+                  object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
+                  object_policy=object_policy, reward_fun=reward_fun, clip_Q_neg=clip_Q_neg,
+                  )
+    normalizer = Normalizer()
 
     for _ in range(1):
         state_all = dummy_env.reset()
@@ -151,19 +173,14 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
             goal = K.tensor(state_all['desired_goal'], dtype=K.float32).unsqueeze(0)
 
             # Observation normalization
-            obs_goal = []
-            obs_goal.append(K.cat([obs[agent_id], goal], dim=-1))
-            if normalizer[agent_id] is not None:
-                obs_goal[0] = normalizer[agent_id].preprocess_with_update(obs_goal[0])
+            obs_goal = K.cat([obs[0], goal], dim=-1)
+            obs_goal = normalizer.preprocess_with_update(obs_goal)
 
-            action = model.select_action(obs_goal[0], noise).cpu().numpy().squeeze(0)
-            action_to_env = np.zeros_like(dummy_env.action_space.sample())
-            if agent_id == 0:
-                action_to_env[0:action.shape[0]] = action
-            else:
-                action_to_env[-action.shape[0]::] = action
+            rob_action = model.select_action(obs_goal, noise[0], 0)
+            obj_action = model.select_action(obs_goal, noise[1], 1)
+            action = K.cat((rob_action, obj_action), dim=1).cpu().numpy().squeeze(0)
 
-            next_state_all, _, _, _ = dummy_env.step(action_to_env)
+            next_state_all, _, _, _ = dummy_env.step(action)
 
             # Move to the next state
             state_all = next_state_all
@@ -182,7 +199,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
         }
     memory = ReplayBuffer(buffer_shapes, MEM_SIZE, config['episode_length'], sample_her_transitions)
 
-    experiment_args = ((envs,envs_test), memory, noise, config, normalizer, agent_id)
+    experiment_args = ((envs, envs_test, envs_render), memory, noise, config, normalizer)
           
     return model, experiment_args
 
@@ -219,35 +236,18 @@ def rollout(env, model, noise, config, normalizer=None, render=False, agent_id=0
         goal = K.tensor(state_all['desired_goal'], dtype=K.float32)
 
         # Observation normalization
-        obs_goal = []
+        obs_goal = K.cat([obs[i_agent], goal], dim=-1)
         for i_agent in range(2):
             obs_goal.append(K.cat([obs[i_agent], goal], dim=-1))
             if normalizer[i_agent] is not None:
                 obs_goal[i_agent] = normalizer[i_agent].preprocess_with_update(obs_goal[i_agent])
 
-        action = model.select_action(obs_goal[agent_id], noise).cpu().numpy()
-
+        rob_action = model.select_action(obs_goal[agent_id], noise).cpu().numpy()
+        action_to_env = np.zeros((len(action), len(env.action_space.sample())))
         if agent_id == 0:
-            action_to_env = np.zeros((len(action), len(env.action_space.sample())))
             action_to_env[:,0:action.shape[1]] = action
-            if ai_object:
-                action_to_env[:, action.shape[1]::] = model.get_obj_action(obs_goal[1]).cpu().numpy()
             action_to_mem = action_to_env
         else:
-            action_to_env = np.zeros((len(action), len(env.action_space.sample())))
-            # if 'Fetch' in config['env_id']:
-            #     action_to_env[:,0:4] = env.action_space.sample()[0:4] * rob_policy[0] + np.ones_like(env.action_space.sample())[0:4] * rob_policy[1]
-            #     action_to_env[:,4:7] = action
-            #     rotatation_noise = Noise(4, sigma=0.2, eps=0.3)
-            #     action_to_env[:,7:11] = rotatation_noise.get_noisy_action(action_to_env[:,7:11])
-            #     action_to_mem = action_to_env[:,0:7]
-            # elif 'HandManipulate' in config['env_id'] and 'Rotate' in config['env_id']:
-            #     action_to_env[:,0:20] = env.action_space.sample()[0:20] * rob_policy[0] + np.ones_like(env.action_space.sample())[0:20] * rob_policy[1]
-            #     translation_noise = Noise(3, sigma=0.1, eps=0.0)
-            #     action_to_env[:,20:23] = translation_noise.get_noisy_action(action_to_env[:,20:23])
-            #     action_to_env[:,23:27] = action
-            #     action_to_mem = np.concatenate((action_to_env[:,0:20], action),axis=-1)
-            # else:
             action_to_env[:,] = env.action_space.sample() * rob_policy[0] + np.ones_like(env.action_space.sample()) * rob_policy[1]
             action_to_env[:,-action.shape[1]::] = action
             action_to_mem = action_to_env
