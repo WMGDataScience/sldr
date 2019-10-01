@@ -4,10 +4,10 @@ import time
 
 import torch as K
 
-from her.utils import get_params as get_params, running_mean, get_exp_params
-from her.main import init, run
-from her.main_ppo import init as init_ppo
-from her.main_ppo import run as run_ppo
+from sldr.utils import get_params as get_params, running_mean, get_exp_params
+from sldr.main import init, run
+from sldr.main_ppo import init as init_ppo
+from sldr.main_ppo import run as run_ppo
 import matplotlib.pyplot as plt
 
 import os
@@ -30,11 +30,11 @@ elif exp_config['env'] == 'PnP':
 if exp_config['multiseed'] == 'True':
     multiseed = True
     n_envs = 38
-    from her.main import init, run
+    from sldr.main import init, run
 elif exp_config['multiseed'] == 'False':
     multiseed = False
     n_envs = 1
-    from her.main import init, run
+    from sldr.main import init, run
 
 masked_with_r = exp_config['masked_with_r']
 if exp_config['use_her'] == 'True':

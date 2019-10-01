@@ -4,14 +4,14 @@ import time
 
 import torch as K
 
-from her.utils import get_params as get_params, running_mean, get_exp_params
-from her.main import init, run
-from her.main_multi import init as init_multi
-from her.main_multi import run as run_multi
-from her.main_multi_q import init as init_q
-from her.main_multi_q import run as run_q
-from her.main_multi_q_rnd import init as init_q_rnd
-from her.main_multi_q_rnd import run as run_q_rnd
+from sldr.utils import get_params as get_params, running_mean, get_exp_params
+from sldr.main import init, run
+from sldr.main_multi import init as init_multi
+from sldr.main_multi import run as run_multi
+from sldr.main_multi_q import init as init_q
+from sldr.main_multi_q import run as run_q
+from sldr.main_multi_q_rnd import init as init_q_rnd
+from sldr.main_multi_q_rnd import run as run_q_rnd
 import matplotlib.pyplot as plt
 
 import os

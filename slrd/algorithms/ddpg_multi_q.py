@@ -5,8 +5,8 @@ import torch.optim as optim
 
 import numpy as np
 
-from her.agents.basic import BackwardDyn
-from her.utils import get_obj_obs
+from sldr.agents.basic import BackwardDyn
+from sldr.utils import get_obj_obs
 
 import pdb
 

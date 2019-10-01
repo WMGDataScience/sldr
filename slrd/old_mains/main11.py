@@ -10,16 +10,16 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms6 import DDPG_BD, MADDPG_BD
-from her.experience import Normalizer
-#from her.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
-from her.replay_buffer import ReplayBuffer
-#from her.her_sampler import make_sample_her_transitions_v2 as make_sample_her_transitions
-from her.her_sampler import make_sample_her_transitions
-from her.exploration import Noise
-from her.utils import Saver, Summarizer, get_params, running_mean
-from her.agents.basic import Actor 
-from her.agents.basic import Critic
+from sldr.algorithms6 import DDPG_BD, MADDPG_BD
+from sldr.experience import Normalizer
+#from sldr.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
+from sldr.replay_buffer import ReplayBuffer
+#from sldr.her_sampler import make_sample_her_transitions_v2 as make_sample_her_transitions
+from sldr.her_sampler import make_sample_her_transitions
+from sldr.exploration import Noise
+from sldr.utils import Saver, Summarizer, get_params, running_mean
+from sldr.agents.basic import Actor 
+from sldr.agents.basic import Critic
 
 import pdb
 

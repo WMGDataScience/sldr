@@ -10,13 +10,13 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms.ddpg import DDPG_BD
-from her.algorithms.maddpg import MADDPG_BD
-from her.algorithms.ppo import PPO_BD
-from her.experience import Normalizer
-from her.exploration import Noise
-from her.utils import Saver, Summarizer, get_params, running_mean
-from her.agents.basic import Critic
+from sldr.algorithms.ddpg import DDPG_BD
+from sldr.algorithms.maddpg import MADDPG_BD
+from sldr.algorithms.ppo import PPO_BD
+from sldr.experience import Normalizer
+from sldr.exploration import Noise
+from sldr.utils import Saver, Summarizer, get_params, running_mean
+from sldr.agents.basic import Critic
 
 import pdb
 
@@ -70,20 +70,20 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     if config['agent_alg'] == 'DDPG_BD':
         MODEL = DDPG_BD
         OUT_FUNC = K.tanh 
-        from her.agents.basic import Actor 
-        from her.replay_buffer import ReplayBuffer
-        from her.her_sampler import make_sample_her_transitions
+        from sldr.agents.basic import Actor 
+        from sldr.replay_buffer import ReplayBuffer
+        from sldr.her_sampler import make_sample_her_transitions
     elif config['agent_alg'] == 'MADDPG_BD':
         MODEL = MADDPG_BD
         OUT_FUNC = K.tanh 
-        from her.agents.basic import Actor 
-        from her.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
-        from her.her_sampler import make_sample_her_transitions_v2 as make_sample_her_transitions
+        from sldr.agents.basic import Actor 
+        from sldr.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
+        from sldr.her_sampler import make_sample_her_transitions_v2 as make_sample_her_transitions
     elif config['agent_alg'] == 'PPO_BD':
         MODEL = PPO_BD
         OUT_FUNC = 'linear'
-        from her.agents.basic import ActorStoch as Actor 
-        from her.replay_buffer import RolloutStorage as ReplayBuffer
+        from sldr.agents.basic import ActorStoch as Actor 
+        from sldr.replay_buffer import RolloutStorage as ReplayBuffer
 
     #exploration initialization
     if agent == 'robot':

@@ -10,12 +10,12 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms.ppo_fine import PPO_BD
-from her.experience import Normalizer
-from her.exploration import Noise
-from her.utils import Saver, Summarizer, get_params, running_mean
-from her.agents.basic import ActorStoch as Actor 
-from her.agents.basic import Critic
+from sldr.algorithms.ppo_fine import PPO_BD
+from sldr.experience import Normalizer
+from sldr.exploration import Noise
+from sldr.utils import Saver, Summarizer, get_params, running_mean
+from sldr.agents.basic import ActorStoch as Actor 
+from sldr.agents.basic import Critic
 
 import pdb
 
@@ -76,9 +76,9 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
     if config['agent_alg'] == 'PPO_BD':
         MODEL = PPO_BD
         OUT_FUNC = 'linear'
-        from her.replay_buffer import ReplayBuffer
-        from her.her_sampler import make_sample_her_transitions
-        from her.replay_buffer import RolloutStorage as RolloutStorage
+        from sldr.replay_buffer import ReplayBuffer
+        from sldr.her_sampler import make_sample_her_transitions
+        from sldr.replay_buffer import RolloutStorage as RolloutStorage
 
     #exploration initialization
     env[0]._max_episode_steps *= config['max_nb_objects']

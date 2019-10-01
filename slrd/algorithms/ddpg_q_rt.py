@@ -5,7 +5,7 @@ import torch.optim as optim
 
 import numpy as np
 
-from her.agents.basic import BackwardDyn, RandomNetDist
+from sldr.agents.basic import BackwardDyn, RandomNetDist
 
 import pdb
 

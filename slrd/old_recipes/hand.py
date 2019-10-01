@@ -4,12 +4,12 @@ import time
 
 import torch as K
 
-from her.utils import get_params as get_params, running_mean, get_exp_params
-from her.main import init, run
-from her.main_ppo import init as init_ppo
-from her.main_ppo import run as run_ppo
-from her.main_rnd import init as init_rnd
-from her.main_rnd import run as run_rnd
+from sldr.utils import get_params as get_params, running_mean, get_exp_params
+from sldr.main import init, run
+from sldr.main_ppo import init as init_ppo
+from sldr.main_ppo import run as run_ppo
+from sldr.main_rnd import init as init_rnd
+from sldr.main_rnd import run as run_rnd
 import matplotlib.pyplot as plt
 
 import os

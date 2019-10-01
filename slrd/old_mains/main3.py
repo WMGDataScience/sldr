@@ -10,12 +10,12 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms import DDPG, HDDPG
-from her.experience import ReplayMemory, Transition
-from her.exploration import Noise
-from her.utils import Saver, Summarizer, get_noise_scale, get_params, running_mean
-from her.agents.basic import Actor 
-from her.agents.basic import Critic
+from sldr.algorithms import DDPG, HDDPG
+from sldr.experience import ReplayMemory, Transition
+from sldr.exploration import Noise
+from sldr.utils import Saver, Summarizer, get_noise_scale, get_params, running_mean
+from sldr.agents.basic import Actor 
+from sldr.agents.basic import Critic
 
 import pdb
 

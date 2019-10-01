@@ -11,13 +11,13 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms.ddpg_q_fixed_obj import DDPG_BD
-from her.algorithms.maddpg import MADDPG_BD
-from her.experience import Normalizer, RunningMean
-from her.exploration import Noise
-from her.utils import Saver, Summarizer, get_params
-from her.agents.basic import Actor 
-from her.agents.basic import Critic
+from sldr.algorithms.ddpg_q_fixed_obj import DDPG_BD
+from sldr.algorithms.maddpg import MADDPG_BD
+from sldr.experience import Normalizer, RunningMean
+from sldr.exploration import Noise
+from sldr.utils import Saver, Summarizer, get_params
+from sldr.agents.basic import Actor 
+from sldr.agents.basic import Critic
 
 import pdb
 
@@ -99,12 +99,12 @@ def init(config, agent='robot', her=False, object_Qfunc=None,
     OUT_FUNC = K.tanh 
     if config['agent_alg'] == 'DDPG_BD':
         MODEL = DDPG_BD
-        from her.replay_buffer import ReplayBuffer
-        from her.her_sampler import make_sample_her_transitions
+        from sldr.replay_buffer import ReplayBuffer
+        from sldr.her_sampler import make_sample_her_transitions
     elif config['agent_alg'] == 'MADDPG_BD':
         MODEL = MADDPG_BD
-        from her.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
-        from her.her_sampler import make_sample_her_transitions_v2 as make_sample_her_transitions
+        from sldr.replay_buffer import ReplayBuffer_v2 as ReplayBuffer
+        from sldr.her_sampler import make_sample_her_transitions_v2 as make_sample_her_transitions
 
     #exploration initialization
     agent_id = 0

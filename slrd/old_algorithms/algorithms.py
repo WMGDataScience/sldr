@@ -5,8 +5,8 @@ import torch.optim as optim
 
 import numpy as np
 
-from her.exploration import gumbel_softmax
-from her.agents.basic import ForwardDynReg, AutoEncReg, AutoEncNextReg
+from sldr.exploration import gumbel_softmax
+from sldr.agents.basic import ForwardDynReg, AutoEncReg, AutoEncNextReg
 
 import pdb
 

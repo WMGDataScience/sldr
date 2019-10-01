@@ -10,15 +10,15 @@ import torch.nn.functional as F
 
 import gym_wmgds as gym
 
-from her.algorithms.ddpg import DDPG_BD
-from her.algorithms.maddpg import MADDPG_BD
-from her.algorithms.ppo import PPO_BD
-from her.experience import Normalizer, RunningMean
-from her.exploration import Noise
-from her.utils import Saver, Summarizer, get_params
-from her.agents.basic import Critic
-from her.agents.basic import ActorStoch as Actor 
-from her.replay_buffer import RolloutStorage as ReplayBuffer
+from sldr.algorithms.ddpg import DDPG_BD
+from sldr.algorithms.maddpg import MADDPG_BD
+from sldr.algorithms.ppo import PPO_BD
+from sldr.experience import Normalizer, RunningMean
+from sldr.exploration import Noise
+from sldr.utils import Saver, Summarizer, get_params
+from sldr.agents.basic import Critic
+from sldr.agents.basic import ActorStoch as Actor 
+from sldr.replay_buffer import RolloutStorage as ReplayBuffer
 
 import pdb
 
