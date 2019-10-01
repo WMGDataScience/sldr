@@ -655,6 +655,7 @@ def get_exp_params(args=[], verbose=False):
     parser.add_argument("--use_step_reward_fun")
     parser.add_argument("--shaped")
     parser.add_argument("--use_rnd")
+    parser.add_argument("--filepath", default="/home/ok18/Jupyter/notebooks/Reinforcement_Learning/")
 
     # acquire in a dict
     config = parser.parse_args(args)
