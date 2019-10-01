@@ -61,31 +61,28 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                                     observe_obj_grp=config['observe_obj_grp'],
                                     obj_range=config['obj_range'])
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(N_ENVS)])
-        envs_test = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(1)])
+        envs_render = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(1)])
         n_rob_actions = 4
         n_actions = config['max_nb_objects'] * len(config['obj_action_type']) + n_rob_actions
-        #n_actions = config['max_nb_objects'] * 3 + n_rob_actions
     elif 'Fetch' in ENV_NAME and 'Multi' in ENV_NAME and 'Flex' in ENV_NAME:
         dummy_env = gym.make(ENV_NAME, n_objects=config['max_nb_objects'], 
                                     obj_action_type=config['obj_action_type'], 
                                     observe_obj_grp=config['observe_obj_grp'],
                                     obj_range=config['obj_range'])
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(N_ENVS)])
-        envs_test = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(1)])
+        envs_render = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Fetch', agent == 'object') for i_env in range(1)])
         n_rob_actions = 4
         n_actions = 2 * len(config['obj_action_type']) + n_rob_actions
-        #n_actions = config['max_nb_objects'] * 3 + n_rob_actions
     elif 'HandManipulate' in ENV_NAME and 'Multi' in ENV_NAME:
         dummy_env = gym.make(ENV_NAME, obj_action_type=config['obj_action_type'])
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Hand', agent == 'object') for i_env in range(N_ENVS)])
-        envs_test = None
+        envs_render = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Hand', agent == 'object') for i_env in range(N_ENVS)])
         n_rob_actions = 20
         n_actions = 1 * len(config['obj_action_type']) + n_rob_actions
-        #n_actions = 1 * 4 + n_rob_actions
     else:
         dummy_env = gym.make(ENV_NAME)
         envs = SubprocVecEnv([make_env(ENV_NAME, i_env, 'Others', agent == 'object') for i_env in range(N_ENVS)])
-        envs_test = None
+        envs_render = None
 
     def her_reward_fun(ag_2, g, info):  # vectorized
         return dummy_env.compute_reward(achieved_goal=ag_2, desired_goal=g, info=info)
@@ -138,7 +135,8 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
                   Actor, Critic, loss_func, GAMMA, TAU, out_func=OUT_FUNC, discrete=False, 
                   regularization=REGULARIZATION, normalized_rewards=NORMALIZED_REWARDS,
                   agent_id=agent_id, object_Qfunc=object_Qfunc, backward_dyn=backward_dyn, 
-                  object_policy=object_policy, reward_fun=reward_fun, masked_with_r=config['masked_with_r'], clip_Q_neg=clip_Q_neg)
+                  object_policy=object_policy, reward_fun=reward_fun, clip_Q_neg=clip_Q_neg
+                  )
     normalizer = [Normalizer(), Normalizer()]
 
     for _ in range(1):
@@ -182,7 +180,7 @@ def init(config, agent='robot', her=False, object_Qfunc=None, backward_dyn=None,
         }
     memory = ReplayBuffer(buffer_shapes, MEM_SIZE, config['episode_length'], sample_her_transitions)
 
-    experiment_args = ((envs,envs_test), memory, noise, config, normalizer, agent_id)
+    experiment_args = ((envs, envs_render), memory, noise, config, normalizer, agent_id)
           
     return model, experiment_args
 
@@ -235,19 +233,6 @@ def rollout(env, model, noise, config, normalizer=None, render=False, agent_id=0
             action_to_mem = action_to_env
         else:
             action_to_env = np.zeros((len(action), len(env.action_space.sample())))
-            # if 'Fetch' in config['env_id']:
-            #     action_to_env[:,0:4] = env.action_space.sample()[0:4] * rob_policy[0] + np.ones_like(env.action_space.sample())[0:4] * rob_policy[1]
-            #     action_to_env[:,4:7] = action
-            #     rotatation_noise = Noise(4, sigma=0.2, eps=0.3)
-            #     action_to_env[:,7:11] = rotatation_noise.get_noisy_action(action_to_env[:,7:11])
-            #     action_to_mem = action_to_env[:,0:7]
-            # elif 'HandManipulate' in config['env_id'] and 'Rotate' in config['env_id']:
-            #     action_to_env[:,0:20] = env.action_space.sample()[0:20] * rob_policy[0] + np.ones_like(env.action_space.sample())[0:20] * rob_policy[1]
-            #     translation_noise = Noise(3, sigma=0.1, eps=0.0)
-            #     action_to_env[:,20:23] = translation_noise.get_noisy_action(action_to_env[:,20:23])
-            #     action_to_env[:,23:27] = action
-            #     action_to_mem = np.concatenate((action_to_env[:,0:20], action),axis=-1)
-            # else:
             action_to_env[:,] = env.action_space.sample() * rob_policy[0] + np.ones_like(env.action_space.sample()) * rob_policy[1]
             action_to_env[:,-action.shape[1]::] = action
             action_to_mem = action_to_env
@@ -303,7 +288,7 @@ def rollout(env, model, noise, config, normalizer=None, render=False, agent_id=0
         if render:
             frames.append(env.render(mode='rgb_array')[0])
 
-    frames = np.linalg.norm(goal_a - goal_b, axis=-1)
+    distance = np.linalg.norm(goal_a - goal_b, axis=-1)
     
     obs, ags, goals, acts = [], [], [], []
 
@@ -328,20 +313,18 @@ def rollout(env, model, noise, config, normalizer=None, render=False, agent_id=0
 
     info = np.asarray([i_info['is_success'] for i_info in info])
 
-    return trajectories, episode_reward, info, frames
+    return trajectories, episode_reward, info, distance
 
 def run(model, experiment_args, train=True):
 
     total_time_start =  time.time()
 
     envs, memory, noise, config, normalizer, agent_id = experiment_args
-    env, env_test = envs
+    envs_train, envs_render = envs
     
     N_EPISODES = config['n_episodes'] if train else config['n_episodes_test']
     N_CYCLES = config['n_cycles']
-    N_ROLLOUTS = config['n_rollouts']
     N_BATCHES = config['n_batches']
-    N_BD_BATCHES = config['n_bd_batches']
     N_TEST_ROLLOUTS = config['n_test_rollouts']
     BATCH_SIZE = config['batch_size']
     
@@ -355,7 +338,6 @@ def run(model, experiment_args, train=True):
     actor_losses = []
     backward_losses = []
     backward_otw_losses = []
-    rnd_losses = []
 
     best_succeess = -1
         
@@ -366,7 +348,7 @@ def run(model, experiment_args, train=True):
             for i_cycle in range(N_CYCLES):
                 
                 ai_object = 1 if np.random.rand() < config['ai_object_rate']  else 0
-                trajectories, _, _, _ = rollout(env, model, noise, config, normalizer, render=False, agent_id=agent_id, ai_object=ai_object, rob_policy=config['rob_policy'])
+                trajectories, _, _, _ = rollout(envs_train, model, noise, config, normalizer, render=False, agent_id=agent_id, ai_object=ai_object, rob_policy=config['rob_policy'])
                 memory.store_episode(trajectories.copy())   
               
                 for i_batch in range(N_BATCHES):  
@@ -389,7 +371,6 @@ def run(model, experiment_args, train=True):
 
             # <-- end loop: i_cycle
         plot_durations(np.asarray(critic_losses), np.asarray(actor_losses))
-        #plot_durations(np.asarray(backward_losses), np.asarray(backward_losses))
 
         episode_reward_cycle = []
         episode_succeess_cycle = []
@@ -397,16 +378,16 @@ def run(model, experiment_args, train=True):
         rollout_per_env = N_TEST_ROLLOUTS // config['n_envs']
         for i_rollout in range(rollout_per_env):
             render = config['render'] == 2 and i_episode % config['render'] == 0
-            _, episode_reward, success, distance = rollout(env, model, False, config, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
+            _, episode_reward, success, distance = rollout(envs_train, model, False, config, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
                 
             episode_reward_cycle.extend(episode_reward)
             episode_succeess_cycle.extend(success)
             episode_distance_cycle.extend(distance)
 
-        render = (config['render'] == 1) and (i_episode % config['render'] == 0) and (env_test is not None)
+        render = (config['render'] == 1) and (i_episode % config['render'] == 0) and (envs_render is not None)
         if render:
             for i_rollout in range(10):
-                _, _, _, _ = rollout(env_test, model, False, config, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
+                _, _, _, _ = rollout(envs_render, model, False, config, normalizer=normalizer, render=render, agent_id=agent_id, ai_object=False, rob_policy=config['rob_policy'])
         # <-- end loop: i_rollout 
             
         ### MONITORIRNG ###
@@ -452,15 +433,6 @@ def run(model, experiment_args, train=True):
                     backward_losses.append(backward_loss)
 
         plot_durations(np.asarray(backward_otw_losses), np.asarray(backward_losses))
-
-        # print('Training RND')
-        # for _ in range(N_EPISODES*N_CYCLES):
-        #     for i_batch in range(N_BATCHES):
-        #         batch = memory.sample(BATCH_SIZE)
-        #         rnd_loss = model.update_coverage(batch, normalizer)  
-        #         if i_batch == N_BATCHES - 1:
-        #             rnd_losses.append(rnd_loss)
-        # plot_durations(np.asarray(rnd_losses), np.asarray(rnd_losses))
 
     if train:
         print('Training completed')
