@@ -18,7 +18,6 @@ import sys
 
 K.set_num_threads(1)
 
-
 device = K.device("cuda" if K.cuda.is_available() else "cpu")
 dtype = K.float32
 
