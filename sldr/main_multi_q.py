@@ -12,7 +12,6 @@ import torch.nn.functional as F
 import gym_wmgds as gym
 
 from sldr.algorithms.ddpg_multi_q import DDPG_BD
-from sldr.algorithms.maddpg import MADDPG_BD
 from sldr.experience import Normalizer
 from sldr.exploration import Noise
 from sldr.utils import Saver, Summarizer, get_params, running_mean, get_obj_obs
