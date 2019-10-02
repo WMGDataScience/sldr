@@ -15,6 +15,10 @@ import matplotlib.pyplot as plt
 import os
 import pickle
 import sys
+import sldr
+
+#for compatibility to the name change
+sys.modules['her.experience'] = sldr.experience
 
 K.set_num_threads(1)
 
